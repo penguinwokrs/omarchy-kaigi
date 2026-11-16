@@ -6,9 +6,14 @@ receives your data.
 
 ## What Kaigi accesses
 
-When you sign in with Google, Kaigi asks for one permission: **read-only
-access to Google Calendar** (`https://www.googleapis.com/auth/calendar.readonly`).
-It uses that permission to:
+When you sign in with Google, Kaigi asks for two read-only permissions:
+
+- **View events on all your calendars**
+  (`https://www.googleapis.com/auth/calendar.events.readonly`)
+- **See the list of Google calendars you're subscribed to**
+  (`https://www.googleapis.com/auth/calendar.calendarlist.readonly`)
+
+It uses them to:
 
 - list your calendars, so it knows which ones are shown (selected) in Google
   Calendar

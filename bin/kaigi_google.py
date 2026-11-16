@@ -7,7 +7,7 @@ release builds and cannot be reused. The refresh token is kept in the Secret
 Service keyring (secret-tool) and, only when no keyring is reachable, in a
 0600 file. Access tokens are never written anywhere.
 
-Scope: calendar.readonly. API responses are cached for `refreshMinutes`
+Scopes: calendar.events.readonly and calendar.calendarlist.readonly. API responses are cached for `refreshMinutes`
 (0600, ~/.cache/kaigi) so the once-a-minute helper rarely touches the
 network.
 """
@@ -32,6 +32,10 @@ CONFIG_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, "
 STATE_DIR = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.join(HOME, ".local", "state")), "kaigi")
 CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "kaigi")
 CLIENT_PATH = os.path.join(CONFIG_DIR, "google-client.json")
+# Kaigi's own OAuth client, shipped with the plugin. A desktop ("installed
+# app") client secret is not confidential, per Google's OAuth docs. A client
+# the user imports into CLIENT_PATH takes precedence.
+BUNDLED_CLIENT_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "google-client.json")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
 ACCOUNTS_PATH = os.path.join(STATE_DIR, "google-accounts.json")
 
@@ -39,7 +43,12 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 API = "https://www.googleapis.com/calendar/v3"
-SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+# The narrowest scopes Kaigi needs: read events, and list calendars so the user
+# can pick which ones to show. Tokens granted the older, broader
+# calendar.readonly keep working.
+SCOPES = ("https://www.googleapis.com/auth/calendar.events.readonly",
+          "https://www.googleapis.com/auth/calendar.calendarlist.readonly")
+SCOPE = " ".join(SCOPES)
 CONSOLE_URL = "https://console.cloud.google.com/apis/credentials"
 
 TIMEOUT = 15
@@ -114,8 +123,21 @@ class Http:
 # OAuth client and secrets
 
 
-def load_client(path=CLIENT_PATH):
+def client_source(path=CLIENT_PATH):
+    """"user", "bundled" or "" — which OAuth client load_client() will use."""
+    for source, candidate in (("user", path), ("bundled", BUNDLED_CLIENT_PATH)):
+        try:
+            load_client(candidate, fallback=False)
+            return source
+        except ClientMissing:
+            continue
+    return ""
+
+
+def load_client(path=CLIENT_PATH, fallback=True):
     doc = read_json(path, None)
+    if not isinstance(doc, dict) and fallback and path != BUNDLED_CLIENT_PATH:
+        doc = read_json(BUNDLED_CLIENT_PATH, None)
     if not isinstance(doc, dict):
         raise ClientMissing("Google OAuth client is not set up")
     inner = doc.get("installed") or doc.get("web") or doc
@@ -142,7 +164,7 @@ def setup_client(source=None, dest=CLIENT_PATH, downloads=os.path.join(HOME, "Do
         if not cands:
             raise ClientMissing(f"no downloaded OAuth client JSON in {downloads}")
         source = max(cands)[1]
-    load_client(source)  # validates
+    load_client(source, fallback=False)  # validates
     with open(source, encoding="utf-8") as fh:
         write_private(dest, fh.read())
     return source
@@ -381,13 +403,10 @@ def logout(account="default", http_client=None, secrets_store=None, accounts_pat
 
 
 def status(client_path=CLIENT_PATH, accounts_path=ACCOUNTS_PATH):
-    try:
-        load_client(client_path)
-        client = True
-    except ClientMissing:
-        client = False
+    source = client_source(client_path)
     accounts = read_json(accounts_path, {})
-    return {"client": client, "accounts": [{"account": k, "email": v.get("email", "")} for k, v in accounts.items()],
+    return {"client": bool(source), "clientSource": source,
+            "accounts": [{"account": k, "email": v.get("email", "")} for k, v in accounts.items()],
             "consoleUrl": CONSOLE_URL}
 
 

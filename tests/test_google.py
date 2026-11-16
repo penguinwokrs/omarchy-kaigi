@@ -20,6 +20,8 @@ import kaigi_google as g  # noqa: E402
 from test_events import me  # noqa: E402  (the kaigi-events module)
 
 TOKYO = ZoneInfo("Asia/Tokyo")
+# Tests must not pick up a client shipped in bin/.
+g.BUNDLED_CLIENT_PATH = os.path.join(ROOT, "tests", "no-bundled-client.json")
 CLIENT = {"installed": {"client_id": "123-abc.apps.googleusercontent.com", "client_secret": "s3cret"}}
 
 
@@ -179,6 +181,29 @@ class LoginTests(unittest.TestCase):
         self.assertNotIn("default", secrets.data)
         self.assertEqual([c.get("type") for c in g.read_json(self.config, {})["calendars"]], [None])
         self.assertIn((("POST", g.REVOKE_URL, {"token": "rt1"})), fake.calls)
+
+    def test_bundled_client_is_the_fallback(self):
+        bundled = os.path.join(self.tmp.name, "bundled.json")
+        with open(bundled, "w") as fh:
+            json.dump({"installed": {"client_id": "999-bundled.apps.googleusercontent.com", "client_secret": "x"}}, fh)
+        old = g.BUNDLED_CLIENT_PATH
+        g.BUNDLED_CLIENT_PATH = bundled
+        try:
+            missing = os.path.join(self.tmp.name, "none.json")
+            self.assertEqual(g.load_client(missing)["client_id"], "999-bundled.apps.googleusercontent.com")
+            self.assertEqual(g.status(missing, self.accounts)["clientSource"], "bundled")
+            # A client the user imported wins over the bundled one.
+            self.assertEqual(g.load_client(self.client_path)["client_id"], "123-abc.apps.googleusercontent.com")
+            self.assertEqual(g.status(self.client_path, self.accounts)["clientSource"], "user")
+            # setup validates the file it was given, never the bundled one.
+            with self.assertRaises(g.ClientMissing):
+                g.setup_client(missing, os.path.join(self.tmp.name, "dest.json"), self.tmp.name)
+        finally:
+            g.BUNDLED_CLIENT_PATH = old
+
+    def test_scopes_are_the_narrow_read_only_ones(self):
+        self.assertEqual(g.SCOPE.split(), ["https://www.googleapis.com/auth/calendar.events.readonly",
+                                           "https://www.googleapis.com/auth/calendar.calendarlist.readonly"])
 
     def test_setup_picks_newest_download(self):
         dl = os.path.join(self.tmp.name, "Downloads")

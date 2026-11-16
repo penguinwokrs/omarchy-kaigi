@@ -65,7 +65,8 @@ hundred requests a day against a quota of 1,000,000.
      Google Workspace account, *Internal* is enough if your admin allows it.
    - **App name and email:** anything you like.
    - **Scopes:** you don't need to add any; Kaigi asks for
-     `calendar.readonly` when you sign in.
+     `calendar.events.readonly` and `calendar.calendarlist.readonly` when you
+     sign in.
    - **Publishing status:** for *External*, click **Publish app → In
      production**. If you leave it in *Testing*, Google expires the sign-in
      after 7 days. You don't need verification for your own use, but sign-in
@@ -96,8 +97,9 @@ meetings.
 ### How it works
 
 - **Sign-in:** OAuth for installed apps, with a loopback redirect on
-  `127.0.0.1`, PKCE (S256) and a random `state`. Kaigi asks for read-only
-  access (`calendar.readonly`).
+  `127.0.0.1`, PKCE (S256) and a random `state`. Kaigi asks only to read events
+  (`calendar.events.readonly`) and the calendar list
+  (`calendar.calendarlist.readonly`).
 - **Tokens:** the refresh token goes into the GNOME keyring through
   `secret-tool`. Only when no keyring is reachable does it fall back to a 0600
   file under `~/.local/state/kaigi/`. Access tokens are never written to
