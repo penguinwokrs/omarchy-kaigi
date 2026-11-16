@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "Model.js" as Model
 
 // Kaigi's Preferences window, laid out like MeetingBar's Preferences: General,
 // Calendars, Appearance, Events and Advanced. Every control writes
@@ -40,6 +41,41 @@ Item {
     var patch = {}
     patch[key] = value
     if (service) service.saveConfig(patch)
+  }
+
+  // Per-service opening modes (config.providerOpeningModes).
+  function serviceMode(service) {
+    var modes = cfg.providerOpeningModes
+    var v = modes && typeof modes === "object" ? modes[service] : ""
+    return typeof v === "string" && v ? v : "default"
+  }
+
+  function setServiceMode(service, mode) {
+    var modes = cfg.providerOpeningModes && typeof cfg.providerOpeningModes === "object" ? cfg.providerOpeningModes : {}
+    var next = {}
+    for (var k in modes) if (k !== service) next[k] = modes[k]
+    if (mode && mode !== "default") next[service] = mode
+    set("providerOpeningModes", next)
+  }
+
+  function serviceOptions(service) {
+    var out = [
+      { value: "default", label: strings.t("settings.service.default") },
+      { value: "browser", label: strings.t("settings.openIn.browser") },
+      { value: "webapp", label: strings.t("settings.openIn.webapp") }
+    ]
+    var modes = Model.OPENING_MODES[service] || []
+    var handlers = root.service ? root.service.schemeHandlers : null
+    for (var i = 0; i < modes.length; i++) {
+      var mode = modes[i]
+      var label = strings.t("settings.service." + mode)
+      var schemes = Model.APP_SCHEMES[mode] || []
+      var installed = !handlers || schemes.length === 0
+      for (var j = 0; j < schemes.length; j++) if (handlers && handlers[schemes[j]] === true) installed = true
+      if (!installed) label += strings.t("settings.service.notInstalled")
+      out.push({ value: mode, label: label })
+    }
+    return out
   }
 
   function str(key) { return String(cfg[key] === undefined || cfg[key] === null ? "" : cfg[key]) }
@@ -313,6 +349,23 @@ Item {
       }
       ChoiceRow { key: "chromeProfile"; label: strings.t("settings.defaultProfile"); options: root.profileOptions; enabled: root.str("openMeetingsIn") === "webapp" }
       Note { text: strings.t("settings.profileNote") }
+
+      Heading { text: strings.t("settings.services") }
+      Repeater {
+        model: Model.OPENING_SERVICES
+        Dropdown {
+          required property var modelData
+          objectName: "service:" + modelData.service
+          width: root.rowWidth
+          label: modelData.name
+          value: root.serviceMode(modelData.service)
+          options: root.serviceOptions(modelData.service)
+          foreground: root.fg
+          fontFamily: root.fontFamily
+          onChanged: function(v) { root.setServiceMode(modelData.service, v) }
+        }
+      }
+      Note { text: strings.t("settings.servicesNote") }
     }
   }
 

@@ -29,6 +29,7 @@ var DEFAULT_CONFIG = {
   automaticEventJoinTime: 0,                  // seconds before start
   actionGraceSeconds: 300,                    // still fire this late (suspend, shell restart)
   openMeetingsIn: "browser",                  // browser (MeetingBar's default) | webapp
+  providerOpeningModes: {},                   // { zoom: "zoomApp", teams: "teamsApp", ... }
   refreshMinutes: 5,
   dismissedEvents: []
 }
@@ -287,8 +288,157 @@ function pruneFired(fired, now) {
 
 // Schemes the launcher may hand to a browser or xdg-open.
 function launchableUrl(url) {
-  return /^(https?|zoommtg|discord):\/\/[^\s"'<>]+$/.test(String(url || ""))
+  return /^(https?|zoommtg|discord|msteams|jitsi-meet|slack|riversidefm|riverside\.fm|tuple|workchat):\/\/[^\s"'<>]+$/.test(String(url || ""))
 }
+
+// --- opening a meeting -------------------------------------------------------
+//
+// Ported from MeetingBar's MeetingOpener.swift / MeetingProvider.swift: each
+// service may open in its native app (MeetingOpeningMode) instead of the
+// browser. config.providerOpeningModes maps a service id to "default"
+// (follow openMeetingsIn), "browser", "webapp", or one of the app modes below.
+
+var OPENING_MODES = {
+  zoom: ["zoomApp", "zoomWebApp"],
+  zoomgov: ["zoomApp", "zoomWebApp"],
+  teams: ["teamsApp"],
+  jitsi: ["jitsiApp"],
+  slack: ["slackApp"],
+  riverside: ["riversideApp"],
+  tuple: ["tupleApp"],
+  facebook_workspace: ["workplaceApp"]
+}
+
+var APP_NAMES = {
+  zoomApp: "Zoom", teamsApp: "Microsoft Teams", jitsiApp: "Jitsi", slackApp: "Slack",
+  riversideApp: "Riverside", tupleApp: "Tuple", workplaceApp: "Workplace"
+}
+
+// The scheme each app mode hands to xdg-open (bin/kaigi-events reports which
+// ones have a handler installed).
+var APP_SCHEMES = {
+  zoomApp: ["zoommtg"], teamsApp: ["msteams"], jitsiApp: ["jitsi-meet"], slackApp: ["slack"],
+  riversideApp: ["riversidefm", "riverside.fm"], tupleApp: ["tuple"], workplaceApp: ["workchat"]
+}
+
+function setScheme(url, scheme) {
+  return String(url).replace(/^[A-Za-z][A-Za-z0-9+.-]*:/, scheme + ":")
+}
+
+function isZoomHost(host) {
+  return /(^|\.)zoom(-x)?\.(us|com|com\.cn|de)$/.test(host) || /(^|\.)zoomgov\.com$/.test(host)
+}
+
+// zoomWebOpenDestination: https://host/j/123?pwd=x -> zoommtg://host/join?confno=123&pwd=x.
+// Personal rooms (/my/) never go through the app.
+function zoomAppUrl(url) {
+  if (/^https?:\/\/[^\/]+\/my\//.test(url) || url.indexOf("/j/") === -1) return ""
+  return setScheme(url.replace(/\?/g, "&").replace("/j/", "/join?confno="), "zoommtg")
+}
+
+// ZoomNativeOpenStrategy's fallback, the reverse of zoomAppUrl.
+function zoomHttpsUrl(url) {
+  return setScheme(String(url).replace("&", "?").replace("/join?confno=", "/j/"), "https")
+}
+
+// ZoomWebAppURLPolicy: https://host/j/123456?pwd=x -> https://app.zoom.us/wc/123456/start?pwd=x.
+function zoomWebAppUrl(url) {
+  var m = /^https?:\/\/([^\/?#]+)\/j\/(\d{6,})\/?(\?[^#]*)?(#.*)?$/.exec(url)
+  if (!m || !isZoomHost(m[1].toLowerCase())) return ""
+  return "https://app.zoom.us/wc/" + m[2] + "/start" + (m[3] || "")
+}
+
+// SlackHuddleOpenStrategy: https://app.slack.com/huddle/T123/C456 -> slack://join-huddle?team=T123&id=C456.
+function slackAppUrl(url) {
+  var m = /^https?:\/\/[^\/?#]+\/huddle\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)/.exec(url)
+  return m ? "slack://join-huddle?team=" + m[1] + "&id=" + m[2] : ""
+}
+
+// TupleNativeURLPolicy: https://tuple.app/c/abc?x -> tuple://c/abc?x.
+function tupleAppUrl(url) {
+  var m = /^https:\/\/tuple\.app\/c\/([^?#]+)(.*)$/i.exec(url)
+  return m ? "tuple://c/" + m[1] + m[2] : ""
+}
+
+// WorkplaceNativeURLPolicy: workchat://room/?joinurl=<the https URL, encoded>.
+function workplaceAppUrl(url) {
+  var m = /^https?:\/\/([^\/?#]+)\/groupcall\/[^\/?#]+/.exec(url)
+  if (!m) return ""
+  var host = m[1].toLowerCase()
+  if (host !== "workplace.com" && !/\.workplace\.com$/.test(host)) return ""
+  var encoded = encodeURIComponent(url).replace(/[!'()*]/g, function(c) {
+    return "%" + c.charCodeAt(0).toString(16).toUpperCase()
+  })
+  return "workchat://room/?joinurl=" + encoded
+}
+
+function appUrlsFor(mode, url) {
+  switch (mode) {
+  case "zoomApp": var z = zoomAppUrl(url); return z ? [z] : []
+  case "teamsApp": return [setScheme(url, "msteams")]
+  case "jitsiApp": return [setScheme(url, "jitsi-meet")]
+  case "slackApp": var s = slackAppUrl(url); return s ? [s] : []
+  case "riversideApp": return [setScheme(url, "riversidefm"), setScheme(url, "riverside.fm")]
+  case "tupleApp": var t = tupleAppUrl(url); return t ? [t] : []
+  case "workplaceApp": var w = workplaceAppUrl(url); return w ? [w] : []
+  }
+  return []
+}
+
+function providerMode(config, service) {
+  var modes = config.providerOpeningModes
+  var mode = modes && typeof modes === "object" ? modes[service] : undefined
+  return typeof mode === "string" && mode ? mode : "default"
+}
+
+// How to open an event's link. handlers maps a URL scheme to whether an app
+// is registered for it (missing = unknown, assume yes). Returns
+// { url, via: "browser" | "webapp" | "app", unavailable } where unavailable
+// names the app when its link fell back to the browser, or null.
+function openPlan(link, config, handlers) {
+  config = withDefaults(config)
+  if (!link || !launchableUrl(link.url)) return null
+  var url = String(link.url)
+  var service = String(link.service || "")
+  var mode = providerMode(config, service)
+  var via = mode === "browser" ? "browser"
+    : mode === "webapp" ? "webapp"
+    : config.openMeetingsIn === "webapp" ? "webapp" : "browser"
+
+  function hasHandler(scheme) { return !handlers || handlers[scheme] !== false }
+  function viaApp(candidates, name, fallback) {
+    for (var i = 0; i < candidates.length; i++) {
+      var scheme = candidates[i].split(":")[0]
+      if (launchableUrl(candidates[i]) && hasHandler(scheme)) return { url: candidates[i], via: "app", unavailable: "" }
+    }
+    return { url: fallback, via: via, unavailable: name }
+  }
+
+  // zoommtg:// links in the event itself (MeetingBar's zoom_native).
+  if (/^zoommtg:/.test(url)) return viaApp([url], "Zoom", zoomHttpsUrl(url))
+  // Other custom schemes (discord://) only an app can open.
+  if (!/^https?:/.test(url)) return { url: url, via: "app", unavailable: "" }
+
+  var allowed = OPENING_MODES[service] || []
+  if (allowed.indexOf(mode) === -1) return { url: url, via: via, unavailable: "" }
+  if (mode === "zoomWebApp") return { url: zoomWebAppUrl(url) || url, via: via, unavailable: "" }
+  var candidates = appUrlsFor(mode, url)
+  if (candidates.length === 0) return { url: url, via: via, unavailable: "" }
+  return viaApp(candidates, APP_NAMES[mode], url)
+}
+
+// For the settings window: [{ service, name, modes: [mode...] }].
+var OPENING_SERVICES = [
+  { service: "meet", name: "Google Meet" },
+  { service: "zoom", name: "Zoom" },
+  { service: "zoomgov", name: "ZoomGov" },
+  { service: "teams", name: "Microsoft Teams" },
+  { service: "jitsi", name: "Jitsi" },
+  { service: "slack", name: "Slack" },
+  { service: "riverside", name: "Riverside" },
+  { service: "tuple", name: "Tuple" },
+  { service: "facebook_workspace", name: "Facebook Workspace" }
+]
 
 // Notification text goes through an Omarchy component whose text format the
 // plugin does not control; keep markup-shaped input literal.
@@ -312,6 +462,11 @@ if (typeof module !== "undefined") {
     actionIdentity: actionIdentity,
     pruneFired: pruneFired,
     launchableUrl: launchableUrl,
+    openPlan: openPlan,
+    OPENING_MODES: OPENING_MODES,
+    OPENING_SERVICES: OPENING_SERVICES,
+    APP_NAMES: APP_NAMES,
+    APP_SCHEMES: APP_SCHEMES,
     plainNotificationText: plainNotificationText,
     isOngoing: isOngoing
   }

@@ -141,6 +141,7 @@ MeetingBar の環境設定と同じように次のタブがあり、変更はそ
 | `automaticEventJoin` / `…Time` | `false` / `0` | 開始の N 秒前に会議を開く。MeetingBar と同じく、未返答や仮承諾の招待も対象。除きたいときは `showPendingEvents` / `showTentativeEvents` を `hide` にする（メニューからも消える） |
 | `actionGraceSeconds` | `300` | スリープ明けなどで時刻を過ぎていても、この秒数以内なら実行する |
 | `openMeetingsIn` | `browser` | `browser` は `xdg-open` で既定のブラウザに開く（MeetingBar の「標準のウェブブラウザー」と同じ）。`webapp` は `omarchy-launch-webapp` で、今いるワークスペースに単独のウィンドウとして開く（Chrome 系ブラウザのみ。Omarchy 向けの追加機能） |
+| `providerOpeningModes` | `{}` | サービスごとの開き方。例: `{"zoom": "zoomApp", "teams": "teamsApp"}`。値は `default`（`openMeetingsIn` に従う）、`browser`、`webapp`、または下の「対応サービス」にあるアプリの指定。アプリが入っていなければブラウザで開く（MeetingBar と同じ） |
 | `chromeProfile` | `""` | `webapp` のときに会議を開く Chrome のプロファイルのフォルダ名（`Default`、`Profile 2` など。`chrome://version` で確認できる）。カレンダーごとにも指定できる。空なら最後に使ったプロファイル。Google アカウントをプロファイルで分けている場合に便利（Omarchy 向けの追加機能。MeetingBar にはない） |
 | `customRegexes` | `[]` | 追加の会議リンクのパターン。最後に試す |
 | `filterEventRegexes` | `[]` | タイトルが一致した予定を隠す |
@@ -158,6 +159,27 @@ MeetingBar の環境設定と同じように次のタブがあり、変更はそ
 | `showEventEndTime` | `true` | |
 | `showEventMaxTimeUntilEventEnabled` / `…Threshold` | `false` / `60` | N 分以内に始まる予定だけ表示する |
 
+## 対応サービス
+
+MeetingBar が検出する69種類のサービスのリンクを、すべて同じパターンで検出します（`bin/services.json`）。Google Meet、Zoom、Microsoft Teams、Webex、Jitsi、Slack ハドル、Discord、Whereby、Around、Lark / Feishu、StreamYard、Riverside など。Outlook の SafeLinks や Google のリダイレクトも、MeetingBar と同じく元のURLに戻してから判定します。
+
+設定画面の「一般 → サービスごとの開き方」で、次のサービスはアプリで開くように指定できます。アプリが入っていないとき（URLスキームの登録がないとき）は通知を出してブラウザで開きます。
+
+| サービス | 指定 | 開き方 | Linux のアプリ |
+|---|---|---|---|
+| Zoom / ZoomGov | `zoomApp` | `zoommtg://…/join?confno=…` | Zoom 公式の Linux 版 |
+| Zoom / ZoomGov | `zoomWebApp` | `https://app.zoom.us/wc/<ID>/start`（ブラウザ版） | 不要 |
+| Microsoft Teams | `teamsApp` | `msteams://…` | teams-for-linux など（公式の Linux 版はありません） |
+| Jitsi | `jitsiApp` | `jitsi-meet://…` | Jitsi Meet Electron |
+| Slack | `slackApp` | `slack://join-huddle?team=…&id=…` | Slack 公式の Linux 版 |
+| Riverside | `riversideApp` | `riversidefm://…` | （Linux 版は確認できていません） |
+| Tuple | `tupleApp` | `tuple://c/…` | Tuple のアプリ（Linux 版があれば） |
+| Facebook Workspace | `workplaceApp` | `workchat://room/?joinurl=…` | （Linux 版は確認できていません） |
+
+イベントに `zoommtg://` のリンクが直接書かれている場合は、そのまま Zoom アプリで開きます（なければ https に戻してブラウザで開く）。`discord://` のリンクは Discord アプリで開きます。どのサービスも `browser` か `webapp` を個別に指定できます。
+
+MeetingBar にある Google Meet の「Meet in One」と「Google Meet PWA」は macOS 専用のため、代わりに `webapp`（Omarchy の Web アプリとして開く）を使ってください。FaceTime と電話番号のリンクも macOS 専用なので、対応していません（FaceTime の https リンクはブラウザで開きます）。
+
 ## マウス・キー・IPC
 
 - **バー**: 左クリックでパネルを開く。中クリックで次の会議に参加する。右クリックでカレンダーを取り直す。
@@ -174,9 +196,9 @@ MeetingBar の環境設定と同じように次のタブがあり、変更はそ
 ## 仕組み
 
 - `bin/kaigi_google.py` と `bin/kaigi-google` が Google へのログインと Calendar API を担当します。Python の標準ライブラリだけで動きます。
-- `bin/kaigi-events` も標準ライブラリだけで動きます。フィードを読み、繰り返しの予定（RRULE、EXDATE、RDATE、RECURRENCE-ID、タイムゾーン、夏時間）を展開し、MeetingBar のリンク判定と同じ方法で会議リンクを探します。69種類のサービスのパターンは `bin/services.json` にあります。結果は JSON で出力します。
+- `bin/kaigi-events` も標準ライブラリだけで動きます。フィードを読み、繰り返しの予定（RRULE、EXDATE、RDATE、RECURRENCE-ID、タイムゾーン、夏時間）を展開し、MeetingBar のリンク判定と同じ方法で会議リンクを探します。69種類のサービスのパターンは `bin/services.json` にあります。会議アプリの URL スキーム（`zoommtg` など）が登録されているかも調べます。結果は JSON で出力します。
 - `Service.qml` はシェルに1つだけ常駐します。1分ごとにヘルパーを呼び、5秒ごとに通知や自動参加の時刻を確認します。通知や参加の前に、その操作を `~/.local/state/kaigi/fired.json` に記録します。そのため、モニターが複数あっても、プラグインの再読み込みや `omarchy restart shell` をしても、同じ操作は繰り返されません。
-- 開くのは、既知のサービス（または `customRegexes`）に一致し、スキームが `https`、`http`、`zoommtg`、`discord` のURLだけです。URLはシェルを通さず、引数として渡します。
+- 開くのは、既知のサービス（または `customRegexes`）に一致した `https`、`http`、`zoommtg`、`discord` のURLと、そこから作った会議アプリ用のURL（`msteams`、`jitsi-meet`、`slack`、`riversidefm`、`tuple`、`workchat`）だけです。URLはシェルを通さず、引数として渡します。
 - `Panel.qml` がバーのウィジェットとパネル、`SettingsWindow.qml` が設定画面です。`Model.js` に MeetingBar から移植した予定の選び方、表示、タイミングの計算が入っています。
 
 ## 開発
@@ -201,7 +223,7 @@ TZ=Asia/Tokyo node --test tests/
 - ブックマーク
 - AppleScript やショートカットとの連携
 - その場での会議の作成
-- サービスごとのアプリやブラウザの指定
+- サービスごとに別のブラウザ（Firefox、Safari など）を選ぶ機能。Kaigi では「既定のブラウザ」か「Webアプリ」を選べます
 - メニューのタイムライン
 - 予定の詳細のサブメニュー
 - メニューから個別の予定を非表示にする機能

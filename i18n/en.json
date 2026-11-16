@@ -115,5 +115,19 @@
   "settings.openConfigFile": "Open config file",
   "settings.when.join": "Join",
   "settings.when.start": "Start notification",
-  "settings.when.end": "End notification"
+  "settings.when.end": "End notification",
+  "settings.services": "Per-service opening",
+  "settings.service.default": "Follow “Open in” above",
+  "settings.service.zoomApp": "Zoom app",
+  "settings.service.zoomWebApp": "Zoom web app (in the browser)",
+  "settings.service.teamsApp": "Teams app",
+  "settings.service.jitsiApp": "Jitsi Meet app",
+  "settings.service.slackApp": "Slack app (join the huddle)",
+  "settings.service.riversideApp": "Riverside app",
+  "settings.service.tupleApp": "Tuple app",
+  "settings.service.workplaceApp": "Workplace Chat app",
+  "settings.service.notInstalled": " (not installed)",
+  "settings.servicesNote": "When an app is chosen but not installed, the link opens in the browser instead. Links of every other supported service (69 in all) are detected too and open as set in “Open in”.",
+  "appUnavailable.title": "%1 app not found",
+  "appUnavailable.body": "Opening the meeting in the browser instead."
 }

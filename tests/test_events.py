@@ -255,3 +255,31 @@ class MainTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SchemeHandlerTests(unittest.TestCase):
+    def test_desktop_files_and_mimeapps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            apps = os.path.join(tmp, "data", "applications")
+            os.makedirs(apps)
+            with open(os.path.join(apps, "zoom.desktop"), "w") as fh:
+                fh.write("[Desktop Entry]\nName=Zoom\nMimeType=application/x-zoom;x-scheme-handler/zoommtg;\n")
+            conf = os.path.join(tmp, "config")
+            os.makedirs(conf)
+            with open(os.path.join(conf, "mimeapps.list"), "w") as fh:
+                fh.write("[Default Applications]\nx-scheme-handler/msteams=teams-for-linux.desktop\n")
+            env = {"XDG_DATA_HOME": os.path.join(tmp, "data"), "XDG_DATA_DIRS": os.path.join(tmp, "none"),
+                   "XDG_CONFIG_HOME": conf, "XDG_CONFIG_DIRS": os.path.join(tmp, "none")}
+            old = {k: os.environ.get(k) for k in env}
+            os.environ.update(env)
+            try:
+                found = me.scheme_handlers()
+            finally:
+                for k, v in old.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+        self.assertTrue(found["zoommtg"])
+        self.assertTrue(found["msteams"])
+        self.assertFalse(found["slack"])

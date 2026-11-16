@@ -134,3 +134,51 @@ test("fired identities older than two days are pruned", () => {
   const out = M.pruneFired({ a: now, b: now - 3 * 24 * 60 * MIN }, now)
   assert.deepEqual(Object.keys(out), ["a"])
 })
+
+// --- per-service opening (MeetingBar's MeetingOpener) -----------------------
+
+function plan(service, url, modes, handlers, extra) {
+  return M.openPlan({ url: url, service: service }, Object.assign({ providerOpeningModes: modes || {} }, extra || {}), handlers)
+}
+
+test("links open in the browser by default, or the web app when chosen", () => {
+  assert.deepEqual(plan("meet", "https://meet.google.com/abc-defg-hij"), { url: "https://meet.google.com/abc-defg-hij", via: "browser", unavailable: "" })
+  assert.equal(plan("meet", "https://meet.google.com/abc", {}, null, { openMeetingsIn: "webapp" }).via, "webapp")
+  assert.equal(plan("meet", "https://meet.google.com/abc", { meet: "browser" }, null, { openMeetingsIn: "webapp" }).via, "browser")
+  assert.equal(plan("teams", "https://teams.microsoft.com/l/meetup-join/x", { teams: "webapp" }).via, "webapp")
+})
+
+test("Zoom app and web app rewrites match MeetingBar", () => {
+  const url = "https://us02web.zoom.us/j/1234567890?pwd=abc"
+  assert.deepEqual(plan("zoom", url, { zoom: "zoomApp" }),
+    { url: "zoommtg://us02web.zoom.us/join?confno=1234567890&pwd=abc", via: "app", unavailable: "" })
+  assert.equal(plan("zoom", url, { zoom: "zoomWebApp" }).url, "https://app.zoom.us/wc/1234567890/start?pwd=abc")
+  // Personal rooms stay in the browser.
+  assert.equal(plan("zoom", "https://zoom.us/my/someone", { zoom: "zoomApp" }).via, "browser")
+  // zoommtg:// links in the event go to the app, or back to https without one.
+  const native = "zoommtg://zoom.us/join?confno=123&pwd=x"
+  assert.equal(plan("zoom_native", native).via, "app")
+  assert.deepEqual(plan("zoom_native", native, {}, { zoommtg: false }),
+    { url: "https://zoom.us/j/123?pwd=x", via: "browser", unavailable: "Zoom" })
+})
+
+test("other app modes build the native URLs", () => {
+  assert.equal(plan("teams", "https://teams.microsoft.com/l/meetup-join/19%3a/0?context=x", { teams: "teamsApp" }).url,
+    "msteams://teams.microsoft.com/l/meetup-join/19%3a/0?context=x")
+  assert.equal(plan("jitsi", "https://meet.jit.si/Room", { jitsi: "jitsiApp" }).url, "jitsi-meet://meet.jit.si/Room")
+  assert.equal(plan("slack", "https://app.slack.com/huddle/T012/C345", { slack: "slackApp" }).url, "slack://join-huddle?team=T012&id=C345")
+  assert.equal(plan("tuple", "https://tuple.app/c/abc123", { tuple: "tupleApp" }).url, "tuple://c/abc123")
+  assert.equal(plan("riverside", "https://riverside.fm/studio/x", { riverside: "riversideApp" }, { riversidefm: false, "riverside.fm": true }).url,
+    "riverside.fm://riverside.fm/studio/x")
+  assert.equal(plan("facebook_workspace", "https://acme.workplace.com/groupcall/LINK:abc", { facebook_workspace: "workplaceApp" }).url,
+    "workchat://room/?joinurl=https%3A%2F%2Facme.workplace.com%2Fgroupcall%2FLINK%3Aabc")
+})
+
+test("a missing app falls back to the browser and names the app", () => {
+  assert.deepEqual(plan("teams", "https://teams.microsoft.com/l/meetup-join/x", { teams: "teamsApp" }, { msteams: false }),
+    { url: "https://teams.microsoft.com/l/meetup-join/x", via: "browser", unavailable: "Microsoft Teams" })
+  // A mode that does not belong to the service is ignored.
+  assert.equal(plan("meet", "https://meet.google.com/abc", { meet: "zoomApp" }).url, "https://meet.google.com/abc")
+  assert.equal(M.openPlan({ url: "javascript:alert(1)", service: "meet" }, {}, null), null)
+  assert.equal(plan("discord", "discord://discord.com/channels/1/2").via, "app")
+})

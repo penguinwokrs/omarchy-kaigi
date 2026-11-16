@@ -501,6 +501,60 @@ def add_authuser(url, email):
 
 
 # --------------------------------------------------------------------------
+# Meeting apps: which URL schemes have a handler installed, so a link set to
+# open in an app falls back to the browser when the app is missing (what
+# MeetingBar does when NSWorkspace cannot open the app URL).
+
+APP_SCHEMES = ("zoommtg", "msteams", "jitsi-meet", "slack", "riversidefm", "riverside.fm", "tuple", "workchat", "discord")
+
+
+def xdg_dirs(env, default):
+    return [d for d in (os.environ.get(env) or default).split(":") if d]
+
+
+def scheme_handlers():
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local", "share")
+    config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config")
+    data_dirs = [data_home] + xdg_dirs("XDG_DATA_DIRS", "/usr/local/share:/usr/share")
+    wanted = {"x-scheme-handler/" + s: s for s in APP_SCHEMES}
+    found = set()
+
+    def scan(line):
+        for item in re.split(r"[;=]", line):
+            scheme = wanted.get(item.strip().lower())
+            if scheme:
+                found.add(scheme)
+
+    for base in data_dirs:
+        root = os.path.join(base, "applications")
+        for dirpath, _dirs, files in os.walk(root):
+            for name in files:
+                if not name.endswith(".desktop"):
+                    continue
+                try:
+                    with open(os.path.join(dirpath, name), encoding="utf-8", errors="replace") as fh:
+                        for line in fh:
+                            if line.startswith("MimeType="):
+                                scan(line[len("MimeType="):])
+                                break
+                except OSError:
+                    pass
+    # Associations set by hand (xdg-mime default, or a browser installing a PWA).
+    for path in [os.path.join(config_home, "mimeapps.list")] + \
+            [os.path.join(d, "mimeapps.list") for d in xdg_dirs("XDG_CONFIG_DIRS", "/etc/xdg")] + \
+            [os.path.join(d, "applications", "mimeapps.list") for d in data_dirs]:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    key, sep, value = line.partition("=")
+                    if sep and value.strip() and key.strip().lower() in wanted:
+                        found.add(wanted[key.strip().lower()])
+        except OSError:
+            pass
+    return {s: s in found for s in APP_SCHEMES}
+
+
+# --------------------------------------------------------------------------
 # Feeds
 
 
@@ -774,6 +828,7 @@ def main(argv=None):
     result["accounts"] = []      # Google entries, for the settings window
     result["feeds"] = []         # iCalendar entries (names only; URLs are secrets)
     result["chromeProfiles"] = google.chrome_profiles()
+    result["schemeHandlers"] = scheme_handlers()
     google_accounts = google.read_json(google.ACCOUNTS_PATH, {})
     for i, (config_index, cal) in enumerate(calendars):
         name = clip(str(cal.get("name") or f"Calendar {i + 1}"), 80)

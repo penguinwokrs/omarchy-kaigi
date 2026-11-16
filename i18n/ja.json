@@ -115,5 +115,19 @@
   "settings.openConfigFile": "設定ファイルを開く",
   "settings.when.join": "参加するタイミング",
   "settings.when.start": "開始通知のタイミング",
-  "settings.when.end": "終了通知のタイミング"
+  "settings.when.end": "終了通知のタイミング",
+  "settings.services": "サービスごとの開き方",
+  "settings.service.default": "上の「開き方」に従う",
+  "settings.service.zoomApp": "Zoomアプリで開く",
+  "settings.service.zoomWebApp": "Zoomのブラウザ版（Web App）で開く",
+  "settings.service.teamsApp": "Teamsアプリで開く",
+  "settings.service.jitsiApp": "Jitsi Meetアプリで開く",
+  "settings.service.slackApp": "Slackアプリでハドルに参加",
+  "settings.service.riversideApp": "Riversideアプリで開く",
+  "settings.service.tupleApp": "Tupleアプリで開く",
+  "settings.service.workplaceApp": "Workplace Chatアプリで開く",
+  "settings.service.notInstalled": "（未インストール）",
+  "settings.servicesNote": "アプリで開く設定にしても、アプリが入っていないときはブラウザで開きます。ほかのサービス（全69種類）のリンクも検出し、上の「開き方」で開きます。",
+  "appUnavailable.title": "%1 のアプリが見つかりません",
+  "appUnavailable.body": "代わりにブラウザで開きます。"
 }

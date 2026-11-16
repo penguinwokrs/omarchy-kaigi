@@ -66,6 +66,7 @@ Item {
   property var calendarAccounts: []
   property var feeds: []
   property var chromeProfiles: []
+  property var schemeHandlers: null    // { zoommtg: true, msteams: false, ... }
 
   property var fired: ({})
   property bool firedLoaded: false
@@ -101,6 +102,7 @@ Item {
     root.calendarAccounts = Array.isArray(out.accounts) ? out.accounts.slice(0, 10) : []
     root.feeds = Array.isArray(out.feeds) ? out.feeds.slice(0, 20) : []
     root.chromeProfiles = Array.isArray(out.chromeProfiles) ? out.chromeProfiles.slice(0, 20) : []
+    root.schemeHandlers = out.schemeHandlers && typeof out.schemeHandlers === "object" ? out.schemeHandlers : null
     root.lastUpdated = Number(out.generatedAt) || Date.now()
     root.loadedOnce = true
     root.now = Date.now()
@@ -182,22 +184,31 @@ Item {
 
   // ---- joining --------------------------------------------------------------
 
-  // The Chrome profile that holds the right Google sign-in, from
-  // chromeProfile in config.json (per calendar or global). Without one Chrome
-  // uses whichever profile was used last.
-  function launchArgv(url, profile) {
-    var https = /^https?:\/\//.test(url)
-    if (https && root.config.openMeetingsIn !== "browser") {
-      var argv = ["omarchy-launch-webapp", url]
+  // How to open a link (Model.openPlan): in a meeting app through its URL
+  // scheme, or in the browser. webapp windows use the Chrome profile that
+  // holds the right Google sign-in, from chromeProfile in config.json (per
+  // calendar or global); without one Chrome uses the profile used last.
+  function planFor(event) {
+    return event && event.link ? Model.openPlan(event.link, root.config, root.schemeHandlers) : null
+  }
+
+  function launchArgv(plan, profile) {
+    if (plan.via === "webapp" && /^https?:\/\//.test(plan.url)) {
+      var argv = ["omarchy-launch-webapp", plan.url]
       if (/^[A-Za-z0-9 _.-]{1,40}$/.test(String(profile || ""))) argv.push("--profile-directory=" + profile)
       return argv
     }
-    return ["xdg-open", url]
+    return ["xdg-open", plan.url]
   }
 
   function join(event) {
-    if (!event || !event.link || !Model.launchableUrl(event.link.url)) return false
-    Util.execArgv(launchArgv(event.link.url, event.browserProfile))
+    var plan = planFor(event)
+    if (!plan || !Model.launchableUrl(plan.url)) return false
+    // MeetingBar's meetingAppUnavailable message.
+    if (plan.unavailable)
+      Util.execArgv(["omarchy-notification-send", "--app-name", "Kaigi", "-g", "\uDB80\uDCF0", "-u", "normal",
+                     strings.t("appUnavailable.title").arg(plan.unavailable), strings.t("appUnavailable.body")])
+    Util.execArgv(launchArgv(plan, event.browserProfile))
     return true
   }
 
@@ -224,8 +235,9 @@ Item {
     if (/^-/.test(title)) title = "⁠" + title
     var argv = ["omarchy-notification-send", "--app-name", "Kaigi", "-g", "\uDB80\uDCF0", "-u", "normal",
                 title, Model.plainNotificationText(body)]
-    if (event.link && Model.launchableUrl(event.link.url))
-      argv = argv.concat(["--action", strings.t("join")]).concat(launchArgv(event.link.url, event.browserProfile))
+    var plan = planFor(event)
+    if (plan && Model.launchableUrl(plan.url))
+      argv = argv.concat(["--action", strings.t("join")]).concat(launchArgv(plan, event.browserProfile))
     Util.execArgv(argv)
   }
 

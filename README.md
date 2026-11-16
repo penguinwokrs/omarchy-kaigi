@@ -192,6 +192,7 @@ Settings use MeetingBar's names and default values.
 | `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start. As in MeetingBar, this includes invitations you have not answered or answered "maybe"; set `showPendingEvents` / `showTentativeEvents` to `hide` to leave those out (which also hides them from the menu) |
 | `actionGraceSeconds` | `300` | still fire this late, e.g. after suspend |
 | `openMeetingsIn` | `browser` | `browser` opens the link with `xdg-open` in your default browser, like MeetingBar's "Default Browser". `webapp` opens it as its own window on the current workspace with `omarchy-launch-webapp` (Chromium-based browsers; an Omarchy addition) |
+| `providerOpeningModes` | `{}` | per-service opening, e.g. `{"zoom": "zoomApp", "teams": "teamsApp"}`. Values: `default` (follow `openMeetingsIn`), `browser`, `webapp`, or an app mode from "Supported services" below. Without the app installed, the link opens in the browser (as in MeetingBar) |
 | `chromeProfile` | `""` | With `webapp`: the Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Also settable per calendar. Empty means the last used profile. Useful if you keep Google accounts in separate Chrome profiles (an Omarchy addition; MeetingBar has no profiles) |
 | `customRegexes` | `[]` | extra link patterns, tried last |
 | `filterEventRegexes` | `[]` | hide events whose title matches |
@@ -209,6 +210,38 @@ only when `config.json` doesn't set them:
 | `menuEventTitleLength` | `50` | |
 | `showEventEndTime` | `true` | |
 | `showEventMaxTimeUntilEventEnabled` / `…Threshold` | `false` / `60` | show only events starting within N minutes |
+
+## Supported services
+
+Kaigi detects links of all 69 services MeetingBar detects, with the same
+patterns (`bin/services.json`): Google Meet, Zoom, Microsoft Teams, Webex,
+Jitsi, Slack huddles, Discord, Whereby, Around, Lark / Feishu, StreamYard,
+Riverside and more. Like MeetingBar, it unwraps Outlook SafeLinks and Google
+redirects first.
+
+In Settings → General → "Per-service opening", these services can open in
+their app. When the app is not installed (no handler for its URL scheme),
+Kaigi shows a notification and opens the link in the browser.
+
+| Service | Mode | Opens | Linux app |
+|---|---|---|---|
+| Zoom / ZoomGov | `zoomApp` | `zoommtg://…/join?confno=…` | Zoom's Linux client |
+| Zoom / ZoomGov | `zoomWebApp` | `https://app.zoom.us/wc/<id>/start` (in the browser) | none needed |
+| Microsoft Teams | `teamsApp` | `msteams://…` | e.g. teams-for-linux (there is no official Linux client) |
+| Jitsi | `jitsiApp` | `jitsi-meet://…` | Jitsi Meet Electron |
+| Slack | `slackApp` | `slack://join-huddle?team=…&id=…` | Slack's Linux client |
+| Riverside | `riversideApp` | `riversidefm://…` | (no Linux client known) |
+| Tuple | `tupleApp` | `tuple://c/…` | Tuple's app, if available for Linux |
+| Facebook Workspace | `workplaceApp` | `workchat://room/?joinurl=…` | (no Linux client known) |
+
+A `zoommtg://` link in the event opens in the Zoom app directly (or, without
+it, as https in the browser), and `discord://` links open in Discord. Every
+service can also be set to `browser` or `webapp` on its own.
+
+MeetingBar's Google Meet modes "Meet in One" and "Google Meet PWA" are
+macOS-only; use `webapp` (an Omarchy web app window) instead. FaceTime and
+phone links are macOS-only too and are not supported (FaceTime https links
+open in the browser).
 
 ## Mouse, keys, IPC
 
@@ -233,13 +266,16 @@ only when `config.json` doesn't set them:
 - `bin/kaigi-events` also uses only the standard library. It parses the
   feeds and expands recurrences (RRULE, EXDATE, RDATE, RECURRENCE-ID, TZID,
   DST), then finds the meeting link the way MeetingBar's link detector does.
-  The 69 service patterns are in `bin/services.json`. It prints JSON.
+  The 69 service patterns are in `bin/services.json`. It also checks which
+  meeting-app URL schemes (`zoommtg`, …) have a handler. It prints JSON.
 - `Service.qml` runs once per shell. It polls the helper every minute and
   checks for due actions every 5 s. Before it notifies or joins, it records the
   action in `~/.local/state/kaigi/fired.json`. Because of that, multiple
   monitors, plugin reloads and `omarchy restart shell` never repeat an action.
 - Only URLs that match a known service (or your `customRegexes`) with an
-  `https`, `http`, `zoommtg` or `discord` scheme are opened. They are passed as
+  `https`, `http`, `zoommtg` or `discord` scheme, and the meeting-app URLs
+  built from them (`msteams`, `jitsi-meet`, `slack`, `riversidefm`, `tuple`,
+  `workchat`), are opened. They are passed as
   argv, never through a shell.
 - `Panel.qml` is the bar widget and popup, and `SettingsWindow.qml` is the
   settings window. `Model.js` holds the ported selection, formatting and
@@ -269,7 +305,8 @@ These MeetingBar features are not in this version:
 - bookmarks
 - AppleScript/Shortcuts hooks
 - ad-hoc meeting creation
-- per-service native apps or browsers
+- a different browser (Firefox, Safari, …) per service; Kaigi offers the
+  default browser or a web app window
 - the menu timeline
 - event details submenu
 - per-event dismiss from the menu
