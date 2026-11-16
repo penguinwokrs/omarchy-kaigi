@@ -198,6 +198,10 @@ These MeetingBar features are not in this version:
 - event details submenu
 - per-event dismiss from the menu
 
+## Privacy
+
+See [PRIVACY.md](PRIVACY.md). Kaigi reads your calendar read-only and sends nothing anywhere but Google's API.
+
 ## License
 
 Apache-2.0. See `NOTICE` for the parts derived from MeetingBar.
