@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kaigi — your next meeting in the Omarchy bar</title><style>
+body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1d1f21;background:#fafafa}
+h1{font-size:2em;margin-bottom:.2em}h2{margin-top:1.6em}code{background:#eee;padding:1px 4px;border-radius:3px}
+pre{background:#eee;padding:12px;overflow:auto}nav a{margin-right:1em}.lead{font-size:1.15em;color:#444}
+footer{margin-top:3em;font-size:.9em;color:#666}</style></head><body>
+<nav><a href="./">Kaigi</a><a href="privacy.html">Privacy Policy</a><a href="https://github.com/penguinwokrs/omarchy-kaigi">Source code</a></nav>
+
+<h1>Kaigi</h1>
+<p class="lead">Your next meeting and a countdown in the Omarchy bar. Join with one click, get notified when meetings start and end, and optionally have the meeting open by itself.</p>
+<h2>What it does</h2>
+<ul>
+<li>Shows the next meeting and the time until it starts (or the time left) in the bar.</li>
+<li>Lists today's (and optionally tomorrow's) events; click one to open its Google Meet, Zoom, Teams or other meeting link.</li>
+<li>Sends a notification when a meeting starts and ends, and can open the meeting link automatically.</li>
+<li>Reads your calendars from Google Calendar (sign in with Google, read-only) or from iCalendar feeds.</li>
+</ul>
+<h2>How Kaigi uses your Google account</h2>
+<p>When you sign in with Google, Kaigi asks for read-only access to your calendar events and your calendar list. It uses them only to show your upcoming meetings on your own computer. Kaigi runs entirely on your machine; it has no server and sends your data nowhere except to Google's own API. It never creates, changes or deletes anything in your Google account. See the <a href="privacy.html">Privacy Policy</a> for details.</p>
+<h2>Install</h2>
+<p>Kaigi is a plugin for the <a href="https://omarchy.org/">Omarchy</a> Linux desktop (Omarchy 4.5 or later):</p>
+<pre><code>omarchy plugin add https://github.com/penguinwokrs/omarchy-kaigi --enable</code></pre>
+<p>Then open the Kaigi popup in the bar and press <em>Sign in with Google</em>.</p>
+<h2>Source and support</h2>
+<p>Kaigi is open source (Apache-2.0): <a href="https://github.com/penguinwokrs/omarchy-kaigi">github.com/penguinwokrs/omarchy-kaigi</a>. Report problems in its <a href="https://github.com/penguinwokrs/omarchy-kaigi/issues">issue tracker</a>.</p>
+
+<footer>Kaigi is an unofficial, open-source port of MeetingBar for the Omarchy desktop. It is not affiliated with MeetingBar or Google.
+· <a href="privacy.html">Privacy Policy</a></footer>
+</body></html>
