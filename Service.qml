@@ -307,7 +307,8 @@ Item {
 
   Process {
     id: mkStateDir
-    command: ["mkdir", "-p", "-m", "700", root.stateDir]
+    // A fresh install has neither folder until the first save or sign-in.
+    command: ["mkdir", "-p", "-m", "700", root.stateDir, root.configDir]
     running: true
     onExited: root.stateDirReady = true
   }

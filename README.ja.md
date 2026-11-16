@@ -23,15 +23,26 @@
 
 ## インストール
 
+Omarchy 4.5 以降が必要です（Omarchy シェルのプラグインの仕組みを使います）。
+
 ```bash
-git clone https://github.com/penguinwokrs/omarchy-kaigi.git ~/projects/github.com/penguinwokrs/omarchy-kaigi
-cd ~/projects/github.com/penguinwokrs/omarchy-kaigi
-./install.sh            # ~/.config/omarchy/plugins にリンクを張って有効にする
+omarchy plugin add https://github.com/penguinwokrs/omarchy-kaigi --enable
 ```
 
-ウィジェットは `centerEnd` の先頭、つまり時計のすぐ右に置かれます。
-`omarchy bar move penguinwokrs.kaigi --section right` で移動できます。
-`./install.sh --remove` で無効にしてリンクを外します。
+`~/.config/omarchy/plugins/penguinwokrs.kaigi` にインストールされ、ウィジェットが時計の右（`centerEnd`）に置かれます。
+更新は `omarchy plugin update penguinwokrs.kaigi`、削除は `omarchy plugin remove penguinwokrs.kaigi` です。
+ウィジェットは `omarchy bar move penguinwokrs.kaigi --section right` で移動できます。
+
+コードを触る場合は、好きな場所にクローンしてリンクを張る方法もあります。
+
+```bash
+git clone https://github.com/penguinwokrs/omarchy-kaigi.git
+cd omarchy-kaigi
+./install.sh            # ~/.config/omarchy/plugins にリンクを張って有効にする
+./install.sh --remove   # 無効にしてリンクを外す
+```
+
+インストールしたら、パネルを開いて下の「Googleでログイン」の手順に進んでください。
 
 ## カレンダー：Googleでログイン
 

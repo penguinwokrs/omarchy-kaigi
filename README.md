@@ -23,15 +23,28 @@ and ends, and can open the meeting by itself when it starts.
 
 ## Install
 
+Requires Omarchy 4.5 or later (it uses the Omarchy shell's plugin system).
+
 ```bash
-git clone https://github.com/penguinwokrs/omarchy-kaigi.git ~/projects/github.com/penguinwokrs/omarchy-kaigi
-cd ~/projects/github.com/penguinwokrs/omarchy-kaigi
-./install.sh            # symlinks into ~/.config/omarchy/plugins and enables it
+omarchy plugin add https://github.com/penguinwokrs/omarchy-kaigi --enable
 ```
 
-This puts the widget at the start of `centerEnd`, right after the clock. You can
-move it with `omarchy bar move penguinwokrs.kaigi --section right`.
-`./install.sh --remove` disables and unlinks it.
+This installs Kaigi into `~/.config/omarchy/plugins/penguinwokrs.kaigi` and
+puts the widget in `centerEnd`, next to the clock. Update it with
+`omarchy plugin update penguinwokrs.kaigi`, and remove it with
+`omarchy plugin remove penguinwokrs.kaigi`. Move the widget with
+`omarchy bar move penguinwokrs.kaigi --section right`.
+
+To work on the code, clone it anywhere and link it instead:
+
+```bash
+git clone https://github.com/penguinwokrs/omarchy-kaigi.git
+cd omarchy-kaigi
+./install.sh            # symlinks into ~/.config/omarchy/plugins and enables it
+./install.sh --remove   # disables and unlinks it
+```
+
+Then open the popup and follow the Google sign-in steps below.
 
 ## Calendars: Google sign-in
 
