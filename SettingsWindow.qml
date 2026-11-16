@@ -420,23 +420,53 @@ Item {
             visible: acct.modelData.calendars.length === 0
             text: strings.t("settings.noCalendarsYet")
           }
+          // One compact line per calendar: name on the left, a bare switch on
+          // the right; the whole line toggles.
           Repeater {
             model: acct.modelData.calendars
-            Toggle {
+            Item {
+              id: calRow
               required property var modelData
               objectName: "calendar:" + acct.modelData.account + ":" + modelData.id
               width: root.rowWidth
-              label: String(modelData.summary || modelData.id)
-              description: modelData.primary ? strings.t("settings.primary") : ""
-              checked: acct.effective.indexOf(modelData.id) !== -1
-              foreground: root.fg
-              fontFamily: root.fontFamily
-              onClicked: {
+              height: Math.max(calSwitch.height, calName.implicitHeight) + Style.space(2)
+
+              function toggle() {
                 var ids = acct.effective.slice()
-                var at = ids.indexOf(modelData.id)
-                if (at === -1) ids.push(modelData.id)
+                var at = ids.indexOf(calRow.modelData.id)
+                if (at === -1) ids.push(calRow.modelData.id)
                 else ids.splice(at, 1)
                 root.service.setCalendarIds(acct.modelData.configIndex, ids)
+              }
+
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: calRow.toggle()
+              }
+              Text {
+                id: calName
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(4)
+                anchors.right: calSwitch.left
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                text: String(calRow.modelData.summary || calRow.modelData.id)
+                      + (calRow.modelData.primary ? "  ·  " + strings.t("settings.primary") : "")
+                color: root.fg
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+              }
+              ToggleSwitch {
+                id: calSwitch
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                cursorRing: false
+                checked: acct.effective.indexOf(calRow.modelData.id) !== -1
+                foreground: root.fg
+                onToggled: calRow.toggle()
               }
             }
           }
