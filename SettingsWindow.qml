@@ -133,14 +133,66 @@ Item {
     font.pixelSize: Style.font.caption
   }
 
-  component SwitchRow: Toggle {
+  // A compact on/off line: label (and an optional caption) on the left, a bare
+  // switch on the right; the whole line toggles.
+  component CompactSwitch: Item {
+    id: line
+    property string label: ""
+    property string description: ""
+    property bool checked: false
+    signal clicked()
+    width: root.rowWidth
+    height: Math.max(sw.height, texts.implicitHeight) + Style.space(4)
+
+    MouseArea {
+      anchors.fill: parent
+      cursorShape: Qt.PointingHandCursor
+      onClicked: line.clicked()
+    }
+    Column {
+      id: texts
+      anchors.left: parent.left
+      anchors.leftMargin: Style.space(4)
+      anchors.right: sw.left
+      anchors.rightMargin: Style.space(8)
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: Style.space(1)
+      Text {
+        width: parent.width
+        textFormat: Text.PlainText
+        elide: Text.ElideRight
+        text: line.label
+        color: root.fg
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+      }
+      Text {
+        visible: line.description !== ""
+        width: parent.width
+        textFormat: Text.PlainText
+        wrapMode: Text.Wrap
+        text: line.description
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+    }
+    ToggleSwitch {
+      id: sw
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      cursorRing: false
+      checked: line.checked
+      foreground: root.fg
+      onToggled: line.clicked()
+    }
+  }
+
+  component SwitchRow: CompactSwitch {
     property string key: ""
     objectName: "switch:" + key
     property bool fallback: false
-    width: root.rowWidth
     checked: root.on(key, fallback)
-    foreground: root.fg
-    fontFamily: root.fontFamily
     onClicked: root.set(key, !checked)
   }
 
@@ -149,8 +201,9 @@ Item {
     property string key: ""
     objectName: "choice:" + key
     property bool numeric: false
+    property string fallback: ""
     width: root.rowWidth
-    value: root.str(key)
+    value: root.str(key) || fallback
     foreground: root.fg
     fontFamily: root.fontFamily
     onChanged: function(v) { root.set(key, numeric ? Number(v) : v) }
@@ -420,53 +473,20 @@ Item {
             visible: acct.modelData.calendars.length === 0
             text: strings.t("settings.noCalendarsYet")
           }
-          // One compact line per calendar: name on the left, a bare switch on
-          // the right; the whole line toggles.
           Repeater {
             model: acct.modelData.calendars
-            Item {
-              id: calRow
+            CompactSwitch {
               required property var modelData
               objectName: "calendar:" + acct.modelData.account + ":" + modelData.id
-              width: root.rowWidth
-              height: Math.max(calSwitch.height, calName.implicitHeight) + Style.space(2)
-
-              function toggle() {
+              label: String(modelData.summary || modelData.id)
+                     + (modelData.primary ? "  ·  " + strings.t("settings.primary") : "")
+              checked: acct.effective.indexOf(modelData.id) !== -1
+              onClicked: {
                 var ids = acct.effective.slice()
-                var at = ids.indexOf(calRow.modelData.id)
-                if (at === -1) ids.push(calRow.modelData.id)
+                var at = ids.indexOf(modelData.id)
+                if (at === -1) ids.push(modelData.id)
                 else ids.splice(at, 1)
                 root.service.setCalendarIds(acct.modelData.configIndex, ids)
-              }
-
-              MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: calRow.toggle()
-              }
-              Text {
-                id: calName
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(4)
-                anchors.right: calSwitch.left
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                textFormat: Text.PlainText
-                elide: Text.ElideRight
-                text: String(calRow.modelData.summary || calRow.modelData.id)
-                      + (calRow.modelData.primary ? "  ·  " + strings.t("settings.primary") : "")
-                color: root.fg
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-              }
-              ToggleSwitch {
-                id: calSwitch
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                cursorRing: false
-                checked: acct.effective.indexOf(calRow.modelData.id) !== -1
-                foreground: root.fg
-                onToggled: calRow.toggle()
               }
             }
           }
@@ -536,6 +556,7 @@ Item {
       Heading { text: strings.t("settings.bar") }
       ChoiceRow {
         key: "eventTitleFormat"
+        fallback: "show"
         label: strings.t("settings.titleFormat")
         options: [
           { value: "show", label: strings.t("settings.titleFormat.show") },
@@ -547,6 +568,7 @@ Item {
       NumberRow { key: "statusbarEventTitleLength"; fallback: 30; from: 5; to: 55; label: strings.t("settings.titleLength") }
       ChoiceRow {
         key: "eventTimeFormat"
+        fallback: "show"
         label: strings.t("settings.timeFormat")
         options: [{ value: "show", label: strings.t("settings.timeFormat.show") }, { value: "hide", label: strings.t("settings.timeFormat.hide") }]
       }
