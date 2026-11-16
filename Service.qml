@@ -62,6 +62,11 @@ Item {
   property double lastUpdated: 0
   property double now: Date.now()
 
+  // For the settings window (from bin/kaigi-events).
+  property var calendarAccounts: []
+  property var feeds: []
+  property var chromeProfiles: []
+
   property var fired: ({})
   property bool firedLoaded: false
   property bool stateDirReady: false
@@ -93,10 +98,56 @@ Item {
     root.configured = out.configured === true
     root.events = Array.isArray(out.events) ? out.events.slice(0, 500) : []
     root.errors = Array.isArray(out.errors) ? out.errors.slice(0, 20) : []
+    root.calendarAccounts = Array.isArray(out.accounts) ? out.accounts.slice(0, 10) : []
+    root.feeds = Array.isArray(out.feeds) ? out.feeds.slice(0, 20) : []
+    root.chromeProfiles = Array.isArray(out.chromeProfiles) ? out.chromeProfiles.slice(0, 20) : []
     root.lastUpdated = Number(out.generatedAt) || Date.now()
     root.loadedOnce = true
     root.now = Date.now()
     root.runActions()
+  }
+
+  // ---- settings -----------------------------------------------------------
+
+  function cloneConfig() {
+    try { return JSON.parse(JSON.stringify(root.rawConfig || {})) } catch (e) { return ({}) }
+  }
+
+  function writeConfig(next) {
+    root.rawConfig = next
+    configFile.setText(JSON.stringify(next, null, 2) + "\n")
+    // The file can hold iCal feed URLs, which are secrets.
+    Util.execArgv(["chmod", "600", root.configPath])
+    root.refresh(false)
+  }
+
+  function saveConfig(patch) {
+    var next = cloneConfig()
+    for (var key in patch) next[key] = patch[key]
+    writeConfig(next)
+  }
+
+  function updateCalendar(index, key, value) {
+    var next = cloneConfig()
+    if (!Array.isArray(next.calendars) || !next.calendars[index]) return
+    next.calendars[index][key] = value
+    writeConfig(next)
+  }
+
+  function setCalendarIds(index, ids) { updateCalendar(index, "calendarIds", ids.slice(0, 100)) }
+  function setCalendarProfile(index, dir) { updateCalendar(index, "chromeProfile", String(dir || "")) }
+
+  function openConfigFile() {
+    Util.execArgv(["bash", "-c", 'f="$1"; mkdir -p "$(dirname "$f")"; [ -e "$f" ] || cp "$2" "$f"; chmod 600 "$f"; exec omarchy-launch-editor "$f"',
+                   "kaigi", root.configPath,
+                   decodeURIComponent(String(Qt.resolvedUrl("config.example.json")).replace(/^file:\/\//, ""))])
+  }
+
+  function openSettings(page) { settingsWindow.open(page || "") }
+
+  SettingsWindow {
+    id: settingsWindow
+    service: root
   }
 
   // ---- Google -----------------------------------------------------------
@@ -329,6 +380,19 @@ Item {
     function joinNext(): string { return root.joinNext() ? "ok" : "no joinable meeting" }
     function refresh(): string { root.refresh(true); return "ok" }
     function googleLogin(): string { root.googleLogin(); return "ok" }
+    function openSettings(): string { root.openSettings(""); return "ok" }
+    function openSettingsPage(page: string): string { root.openSettings(page); return "ok" }
+    function closeSettings(): string { settingsWindow.close(); return "ok" }
+    // omarchy-shell kaigi set <key> <json value>, e.g. set eventTimeFormat '"hide"'
+    function set(key: string, valueJson: string): string {
+      if (!/^[A-Za-z][A-Za-z0-9]{0,60}$/.test(key) || key === "calendars") return "invalid key"
+      var value
+      try { value = JSON.parse(valueJson) } catch (e) { return "invalid JSON" }
+      var patch = {}
+      patch[key] = value
+      root.saveConfig(patch)
+      return "ok"
+    }
     function next(): string {
       var e = root.nextEvent
       return e ? JSON.stringify({ title: e.title, start: e.start, end: e.end, link: e.link ? e.link.url : "" }) : ""

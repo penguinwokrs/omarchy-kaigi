@@ -322,6 +322,22 @@ def chrome_profile_for(email, config_home=None):
     return ""
 
 
+def chrome_profiles(config_home=None):
+    """[{dir, name, email, browser}] for the settings window's profile picker."""
+    config_home = config_home or os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
+    out = []
+    for browser in ("google-chrome", "chromium"):
+        state = read_json(os.path.join(config_home, browser, "Local State"), {})
+        cache = ((state.get("profile") or {}).get("info_cache") or {}) if isinstance(state, dict) else {}
+        for folder, info in sorted(cache.items()):
+            if isinstance(info, dict):
+                out.append({"dir": folder, "name": str(info.get("name", ""))[:40],
+                            "email": str(info.get("user_name", ""))[:80], "browser": browser})
+        if out:
+            break
+    return out
+
+
 def ensure_config_entry(account, config_path=CONFIG_PATH, email="", config_home=None):
     config = read_json(config_path, {})
     if not isinstance(config, dict):
@@ -428,7 +444,13 @@ def download(account, cal_cfg, window_start, window_end, http_client, secrets_st
     else:
         chosen = [e for e in entries if e.get("selected") or e.get("primary")]
     out = {"fetchedAt": int(time.time()), "windowStart": rfc3339(window_start), "windowEnd": rfc3339(window_end),
-           "calendars": [], "events": {}}
+           "calendars": [], "events": {},
+           # Every calendar of the account, for the settings window's picker.
+           "allCalendars": [{"id": str(e.get("id", "")),
+                             "summary": str(e.get("summaryOverride") or e.get("summary") or e.get("id", ""))[:80],
+                             "color": str(e.get("backgroundColor", ""))[:16],
+                             "googleSelected": bool(e.get("selected")), "primary": bool(e.get("primary"))}
+                            for e in entries[:100]]}
     for cal in chosen[:50]:
         cid = str(cal.get("id", ""))
         out["calendars"].append({"id": cid, "summary": str(cal.get("summaryOverride") or cal.get("summary") or cid)[:80],

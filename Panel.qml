@@ -26,14 +26,19 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
   // ---- display settings (shell.json entry; MeetingBar names) ----
-  readonly property string eventTitleFormat: setting("eventTitleFormat", "show")
-  readonly property string eventTimeFormat: setting("eventTimeFormat", "show")
-  readonly property int titleLength: Math.max(5, Math.min(55, Number(setting("statusbarEventTitleLength", 30)) || 30))
-  readonly property int menuTitleLength: Math.max(10, Number(setting("menuEventTitleLength", 50)) || 50)
-  readonly property bool showEventEndTime: setting("showEventEndTime", true) !== false
+  // Settings window values (config.json) win over the bar entry in shell.json.
+  function opt(name, fallback) {
+    var raw = service && service.rawConfig ? service.rawConfig[name] : undefined
+    return raw === undefined || raw === null ? setting(name, fallback) : raw
+  }
+  readonly property string eventTitleFormat: opt("eventTitleFormat", "show")
+  readonly property string eventTimeFormat: opt("eventTimeFormat", "show")
+  readonly property int titleLength: Math.max(5, Math.min(55, Number(opt("statusbarEventTitleLength", 30)) || 30))
+  readonly property int menuTitleLength: Math.max(10, Number(opt("menuEventTitleLength", 50)) || 50)
+  readonly property bool showEventEndTime: opt("showEventEndTime", true) !== false
   readonly property var displaySettings: ({
-    showEventMaxTimeUntilEventEnabled: setting("showEventMaxTimeUntilEventEnabled", false) === true,
-    showEventMaxTimeUntilEventThreshold: Number(setting("showEventMaxTimeUntilEventThreshold", 60)) || 60
+    showEventMaxTimeUntilEventEnabled: opt("showEventMaxTimeUntilEventEnabled", false) === true,
+    showEventMaxTimeUntilEventThreshold: Number(opt("showEventMaxTimeUntilEventThreshold", 60)) || 60
   })
 
   // ---- state from the service ----
@@ -96,13 +101,11 @@ Panel {
     if (service && service.join(event)) close()
   }
 
-  function openConfig() {
-    if (!service) return
-    Util.execArgv(["bash", "-c", 'f="$1"; mkdir -p "$(dirname "$f")"; [ -e "$f" ] || cp "$2" "$f"; chmod 600 "$f"; exec omarchy-launch-editor "$f"',
-                   "kaigi", service.configPath,
-                   decodeURIComponent(String(Qt.resolvedUrl("config.example.json")).replace(/^file:\/\//, ""))])
+  function openSettings() {
+    if (service) service.openSettings("")
     close()
   }
+
 
   // ---- keyboard cursor over joinable rows ----
   property int cursor: -1
@@ -475,7 +478,7 @@ Panel {
               text: strings.t("calendars")
               foreground: root.foreground
               fontFamily: root.fontFamily
-              onClicked: root.openConfig()
+              onClicked: root.openSettings()
             }
           }
 

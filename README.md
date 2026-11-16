@@ -107,6 +107,26 @@ says which attendee is you.
 
 ## Settings
 
+Open the settings window from the popup's **設定 / Settings** button, or run
+`omarchy-shell kaigi openSettings`. Like MeetingBar's Preferences, it has
+these tabs, and changes save immediately:
+
+- **General:** auto-join, start and end notifications with their timing, and
+  how and in which Chrome profile meetings open.
+- **Calendars:** Google accounts (add or sign out), which calendars to show for
+  each account, each account's Chrome profile, iCal feeds, and the display
+  period.
+- **Appearance:** the bar title, time left, title length, the ongoing-meeting
+  rule, "only events starting soon", and the menu title length and end time.
+- **Events:** all-day events, events without a meeting link, events without
+  attendees, past events, and pending, tentative and declined events.
+- **Advanced:** title filters, extra link patterns, refresh interval, grace
+  period, and opening the config file.
+
+Everything is stored in `~/.config/kaigi/config.json` (0600). From a script,
+use `omarchy-shell kaigi set <key> <json>`, for example
+`omarchy-shell kaigi set eventTimeFormat '"hide"'`.
+
 Settings use MeetingBar's names and default values.
 
 **Behaviour** goes in `config.json`:
@@ -131,8 +151,9 @@ Settings use MeetingBar's names and default values.
 | `filterEventRegexes` | `[]` | hide events whose title matches |
 | `dismissedEvents` | `[]` | event ids to ignore |
 
-**Display** goes in the bar entry in `shell.json`, set with
-`omarchy bar set penguinwokrs.kaigi <key> <value>`:
+**Display** options also live in `config.json`. Values in the bar entry in
+`shell.json` (`omarchy bar set penguinwokrs.kaigi <key> <value>`) are used
+only when `config.json` doesn't set them:
 
 | key | default | values |
 |---|---|---|

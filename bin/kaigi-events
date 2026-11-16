@@ -758,7 +758,8 @@ def main(argv=None):
         print(json.dumps(result))
         return 0
 
-    calendars = [c for c in config.get("calendars", []) if isinstance(c, dict) and c.get("enabled", True)]
+    raw_calendars = config.get("calendars", []) if isinstance(config.get("calendars"), list) else []
+    calendars = [(i, c) for i, c in enumerate(raw_calendars) if isinstance(c, dict) and c.get("enabled", True)]
     result["configured"] = bool(calendars)
     max_age = max(60, int(config.get("refreshMinutes", 5)) * 60)
     custom = compile_list(config.get("customRegexes"), "customRegexes", result["errors"])
@@ -770,7 +771,11 @@ def main(argv=None):
     window_end = window_start + dt.timedelta(days=max(1, args.days))
 
     events = []
-    for i, cal in enumerate(calendars):
+    result["accounts"] = []      # Google entries, for the settings window
+    result["feeds"] = []         # iCalendar entries (names only; URLs are secrets)
+    result["chromeProfiles"] = google.chrome_profiles()
+    google_accounts = google.read_json(google.ACCOUNTS_PATH, {})
+    for i, (config_index, cal) in enumerate(calendars):
         name = clip(str(cal.get("name") or f"Calendar {i + 1}"), 80)
         emails = set(base_emails)
         if cal.get("email"):
@@ -785,8 +790,15 @@ def main(argv=None):
             if gerr:
                 result["errors"].append({"calendar": name, "message": str(gerr)[:200], "code": gerr.code,
                                          "account": account})
+            email = str(google_accounts.get(account, {}).get("email", ""))
+            result["accounts"].append({
+                "configIndex": config_index, "account": account, "email": email,
+                "calendarIds": [str(x) for x in (cal.get("calendarIds") or [])][:100],
+                "chromeProfile": str(cal.get("chromeProfile") or ""),
+                "calendars": (snap or {}).get("allCalendars") or (snap or {}).get("calendars") or [],
+                "activeIds": [c["id"] for c in (snap or {}).get("calendars", [])],
+            })
             if snap:
-                email = google.read_json(google.ACCOUNTS_PATH, {}).get(account, {}).get("email", "")
                 helpers = {"find_link": find_link, "add_authuser": add_authuser, "strip_html": strip_html,
                            "clip": clip, "to_ms": to_ms, "max_title": MAX_TITLE, "max_text": MAX_TEXT}
                 try:
@@ -797,6 +809,8 @@ def main(argv=None):
             for ev in events[start_count:]:
                 ev["browserProfile"] = profile
             continue
+        result["feeds"].append({"configIndex": config_index, "name": name,
+                                "kind": "file" if cal.get("path") else "url"})
         url = str(cal.get("url") or "")
         if url and not emails and feed_email(url):
             emails.add(feed_email(url).lower())
