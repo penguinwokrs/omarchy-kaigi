@@ -112,5 +112,8 @@
   "settings.grace": "Late grace period (seconds)",
   "settings.graceNote": "After suspend, notifications and auto-join still run if no more than this late.",
   "settings.files": "Files",
-  "settings.openConfigFile": "Open config file"
+  "settings.openConfigFile": "Open config file",
+  "settings.when.join": "Join",
+  "settings.when.start": "Start notification",
+  "settings.when.end": "End notification"
 }

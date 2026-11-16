@@ -57,8 +57,10 @@ Item {
   readonly property var timingEnd: [
     { value: "0", label: strings.t("settings.atEnd") },
     { value: "60", label: strings.t("settings.minBefore").arg(1) },
+    { value: "120", label: strings.t("settings.minBefore").arg(2) },
     { value: "180", label: strings.t("settings.minBefore").arg(3) },
-    { value: "300", label: strings.t("settings.minBefore").arg(5) }
+    { value: "300", label: strings.t("settings.minBefore").arg(5) },
+    { value: "600", label: strings.t("settings.minBefore").arg(10) }
   ]
   readonly property var profileOptions: {
     var out = [{ value: "", label: strings.t("settings.profileLastUsed") }]
@@ -294,13 +296,13 @@ Item {
 
       Heading { text: strings.t("settings.autoJoin") }
       SwitchRow { key: "automaticEventJoin"; label: strings.t("settings.autoJoin.label"); description: strings.t("settings.autoJoin.desc") }
-      ChoiceRow { key: "automaticEventJoinTime"; numeric: true; label: strings.t("settings.when"); options: root.timingStart; enabled: root.on("automaticEventJoin", false) }
+      ChoiceRow { key: "automaticEventJoinTime"; numeric: true; label: strings.t("settings.when.join"); options: root.timingStart; enabled: root.on("automaticEventJoin", false) }
 
       Heading { text: strings.t("settings.notifications") }
       SwitchRow { key: "joinEventNotification"; fallback: true; label: strings.t("settings.notifyStart") }
-      ChoiceRow { key: "joinEventNotificationTime"; numeric: true; label: strings.t("settings.when"); options: root.timingStart; enabled: root.on("joinEventNotification", true) }
+      ChoiceRow { key: "joinEventNotificationTime"; numeric: true; label: strings.t("settings.when.start"); options: root.timingStart; enabled: root.on("joinEventNotification", true) }
       SwitchRow { key: "endOfEventNotification"; fallback: true; label: strings.t("settings.notifyEnd") }
-      ChoiceRow { key: "endOfEventNotificationTime"; numeric: true; label: strings.t("settings.when"); options: root.timingEnd; enabled: root.on("endOfEventNotification", true) }
+      ChoiceRow { key: "endOfEventNotificationTime"; numeric: true; label: strings.t("settings.when.end"); options: root.timingEnd; enabled: root.on("endOfEventNotification", true) }
       Note { text: strings.t("settings.actionsNote") }
 
       Heading { text: strings.t("settings.openMeetings") }
