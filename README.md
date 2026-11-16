@@ -44,7 +44,8 @@ cd omarchy-kaigi
 ./install.sh --remove   # disables and unlinks it
 ```
 
-Then open the popup and follow the Google sign-in steps below.
+Then open the popup and follow the Google sign-in steps below. For now,
+Google shows a warning page during sign-in ([details](#calendars-google-sign-in)).
 
 ## Calendars: Google sign-in
 
@@ -53,10 +54,21 @@ API" provider does, and ships its own OAuth client (`bin/google-client.json`),
 as MeetingBar does. Open the popup, press **Googleでログイン / Sign in with
 Google**, pick your account and allow read access. That's all.
 
-> Kaigi's Google verification is in progress. Until it completes, Google shows
-> a "Google hasn't verified this app" page during sign-in (choose *Advanced →
-> Go to Kaigi*), and the shared client accepts at most 100 users. You can use
-> your own client instead, as described below.
+> [!WARNING]
+> **Sign-in shows a warning.** Kaigi hasn't been through Google's app
+> verification yet, so Google shows a "Google hasn't verified this app" page
+> during sign-in. To continue, click **Advanced** → **Go to Kaigi (unsafe)**.
+>
+> - Kaigi asks only to **read** your events and calendar list. It never
+>   creates, changes, or deletes anything.
+> - Your data goes directly from Google to your computer and nowhere else
+>   ([privacy policy](PRIVACY.md)).
+> - Until verification completes, at most 100 people in total can sign in
+>   with the bundled client.
+>
+> To avoid the 100-user limit, use your own client as described below (it
+> shows the same warning). Verification is being prepared; once Google
+> approves it, the warning goes away.
 
 ### Optional: use your own OAuth client (about 5 minutes)
 
