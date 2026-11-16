@@ -45,6 +45,12 @@ Panel {
   readonly property string mode: Model.titleMode(nextEvent, displaySettings, now)
   readonly property bool configured: service ? service.configured : false
   readonly property bool googleSignedOut: service ? (service.googleAccounts.length === 0 || service.googleAuthRequired) : true
+
+  function accountEmail(account) {
+    var list = service ? service.googleAccounts : []
+    for (var i = 0; i < list.length; i++) if (list[i].account === account) return list[i].email || account
+    return account
+  }
   readonly property bool hasErrors: service ? (service.errors.length > 0 || service.configError !== "") : false
 
   readonly property var units: ({
@@ -250,14 +256,26 @@ Panel {
             }
             Button {
               width: parent.width
-              visible: !!root.service && root.service.googleClient && root.googleSignedOut
+              visible: !!root.service && root.service.googleClient && root.service.googleAccounts.length === 0
               enabled: root.service ? root.service.googleState !== "running" : false
               iconText: "󰊭"
-              text: root.service && root.service.googleAuthRequired && root.service.googleAccounts.length > 0
-                ? strings.t("google.signInAgain") : strings.t("google.signIn")
+              text: strings.t("google.signIn")
               foreground: root.foreground
               fontFamily: root.fontFamily
-              onClicked: root.service.googleLogin()
+              onClicked: root.service.googleLogin("auto")
+            }
+            Repeater {
+              model: root.service && root.service.googleAccounts.length > 0 ? root.service.googleAuthRequiredAccounts : []
+              Button {
+                required property var modelData
+                width: column.width
+                enabled: root.service ? root.service.googleState !== "running" : false
+                iconText: "󰊭"
+                text: strings.t("google.signInAgainFor").arg(root.accountEmail(modelData))
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                onClicked: root.service.googleLogin(modelData)
+              }
             }
             PlainText {
               width: parent.width
@@ -391,6 +409,58 @@ Panel {
 
           PanelSeparator { width: parent.width; foreground: root.foreground }
 
+          // ---- Google accounts ----
+          Column {
+            width: parent.width
+            spacing: Style.space(2)
+            visible: !!root.service && root.service.googleClient && root.service.googleAccounts.length > 0
+
+            PanelSectionHeader {
+              width: parent.width
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              text: strings.t("google.accounts")
+            }
+            Repeater {
+              model: root.service ? root.service.googleAccounts : []
+              Item {
+                id: accountRow
+                required property var modelData
+                width: column.width
+                height: Math.max(signOutButton.implicitHeight, accountText.implicitHeight)
+                PlainText {
+                  id: accountText
+                  anchors.left: parent.left
+                  anchors.leftMargin: Style.space(8)
+                  anchors.right: signOutButton.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  color: root.service && root.service.googleAuthRequiredAccounts.indexOf(accountRow.modelData.account) !== -1
+                    ? (root.bar ? root.bar.urgent : Commons.Color.urgent) : root.foreground
+                  text: String(accountRow.modelData.email || accountRow.modelData.account)
+                }
+                Button {
+                  id: signOutButton
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  enabled: root.service ? root.service.googleState !== "running" : false
+                  iconText: "󰍃" // nf-md-logout
+                  text: strings.t("google.signOut")
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onClicked: root.service.googleLogout(accountRow.modelData.account)
+                }
+              }
+            }
+            Button {
+              enabled: root.service ? root.service.googleState !== "running" : false
+              iconText: "󰐕" // nf-md-plus
+              text: strings.t("google.addAccount")
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: root.service.googleLogin("auto")
+            }
+          }
+
           Row {
             spacing: Style.space(6)
             Button {
@@ -399,14 +469,6 @@ Panel {
               foreground: root.foreground
               fontFamily: root.fontFamily
               onClicked: if (root.service) root.service.refresh(true)
-            }
-            Button {
-              visible: !!root.service && root.service.googleAccounts.length > 0
-              iconText: "󰍃" // nf-md-logout
-              text: strings.t("google.signOut")
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.service.googleLogout()
             }
             Button {
               iconText: "󰒓" // nf-md-cog
@@ -422,8 +484,6 @@ Panel {
             color: root.dim
             font.pixelSize: Style.font.caption
             text: strings.t("updatedAt").arg(root.service ? root.timeText(root.service.lastUpdated) : "")
-              + (root.service && root.service.googleAccounts.length > 0 && root.service.googleAccounts[0].email
-                 ? "  ·  " + root.service.googleAccounts[0].email : "")
           }
         }
       }

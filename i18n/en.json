@@ -29,7 +29,9 @@
   "google.openConsole": "Open Google Cloud Console",
   "google.importClient": "Import downloaded JSON",
   "google.signIn": "Sign in with Google",
-  "google.signInAgain": "Sign in to Google again",
   "google.signOut": "Sign out",
-  "google.waiting": "Finish signing in in your browser…"
+  "google.waiting": "Finish signing in in your browser…",
+  "google.accounts": "Google accounts",
+  "google.addAccount": "Add account",
+  "google.signInAgainFor": "Sign in again: %1"
 }

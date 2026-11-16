@@ -293,17 +293,36 @@ def login(account="default", http_client=None, opener=default_opener, secrets_st
         raise GoogleError(f"token exchange failed ({tok.get('error', status)})")
     status, primary = http_client.request("GET", f"{API}/users/me/calendarList/primary",
                                           headers={"Authorization": f"Bearer {tok['access_token']}"})
-    email = primary.get("id") if status == 200 else ""
-    where = secrets_store.store(account, tok["refresh_token"])
+    email = str(primary.get("id") or "") if status == 200 else ""
     accounts = read_json(accounts_path, {})
-    accounts[account] = {"email": str(email or ""), "addedAt": int(time.time()), "storage": where}
+    if account == "auto":
+        # "Add account": key the account by its address, reusing the key of
+        # an account already signed in with the same address.
+        same = [k for k, v in accounts.items() if email and str(v.get("email", "")).lower() == email.lower()]
+        account = same[0] if same else (email.lower() if email else "default")
+    where = secrets_store.store(account, tok["refresh_token"])
+    accounts[account] = {"email": email, "addedAt": int(time.time()), "storage": where}
     write_private(accounts_path, json.dumps(accounts, indent=2) + "\n")
-    ensure_config_entry(account, config_path)
+    ensure_config_entry(account, config_path, email)
     progress({"event": "done", "account": account, "email": email, "storage": where})
     return email
 
 
-def ensure_config_entry(account, config_path=CONFIG_PATH):
+def chrome_profile_for(email, config_home=None):
+    """Chrome/Chromium profile folder whose signed-in Google account is `email`."""
+    if not email:
+        return ""
+    config_home = config_home or os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
+    for browser in ("google-chrome", "chromium"):
+        state = read_json(os.path.join(config_home, browser, "Local State"), {})
+        cache = ((state.get("profile") or {}).get("info_cache") or {}) if isinstance(state, dict) else {}
+        for folder, info in cache.items():
+            if isinstance(info, dict) and str(info.get("user_name", "")).lower() == email.lower():
+                return folder
+    return ""
+
+
+def ensure_config_entry(account, config_path=CONFIG_PATH, email="", config_home=None):
     config = read_json(config_path, {})
     if not isinstance(config, dict):
         config = {}
@@ -311,7 +330,11 @@ def ensure_config_entry(account, config_path=CONFIG_PATH):
     if not isinstance(cals, list):
         cals = []
     if not any(isinstance(c, dict) and c.get("type") == "google" and c.get("account", "default") == account for c in cals):
-        cals.append({"type": "google", "name": "Google", "account": account, "calendarIds": []})
+        entry = {"type": "google", "name": "Google", "account": account, "calendarIds": []}
+        profile = chrome_profile_for(email, config_home)
+        if profile:
+            entry["chromeProfile"] = profile
+        cals.append(entry)
         config["calendars"] = cals
         write_private(config_path, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
 

@@ -783,7 +783,8 @@ def main(argv=None):
             account = str(cal.get("account") or "default")
             snap, gerr = google.load(account, cal, window_start, window_end, max_age, args.force)
             if gerr:
-                result["errors"].append({"calendar": name, "message": str(gerr)[:200], "code": gerr.code})
+                result["errors"].append({"calendar": name, "message": str(gerr)[:200], "code": gerr.code,
+                                         "account": account})
             if snap:
                 email = google.read_json(google.ACCOUNTS_PATH, {}).get(account, {}).get("email", "")
                 helpers = {"find_link": find_link, "add_authuser": add_authuser, "strip_html": strip_html,

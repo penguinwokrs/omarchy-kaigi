@@ -29,7 +29,9 @@
   "google.openConsole": "Google Cloud Consoleを開く",
   "google.importClient": "ダウンロードしたJSONを取り込む",
   "google.signIn": "Googleでログイン",
-  "google.signInAgain": "Googleに再ログイン",
   "google.signOut": "ログアウト",
-  "google.waiting": "ブラウザでログインを完了してください…"
+  "google.waiting": "ブラウザでログインを完了してください…",
+  "google.accounts": "Googleアカウント",
+  "google.addAccount": "アカウントを追加",
+  "google.signInAgainFor": "再ログイン: %1"
 }

@@ -40,10 +40,14 @@ Item {
     for (var i = 0; i < cals.length; i++) if (cals[i] && cals[i].type === "google") return true
     return false
   }
-  readonly property bool googleAuthRequired: {
-    for (var i = 0; i < errors.length; i++) if (errors[i] && errors[i].code === "auth_required") return true
-    return false
+  readonly property var googleAuthRequiredAccounts: {
+    var out = []
+    for (var i = 0; i < errors.length; i++)
+      if (errors[i] && errors[i].code === "auth_required" && out.indexOf(String(errors[i].account || "default")) === -1)
+        out.push(String(errors[i].account || "default"))
+    return out
   }
+  readonly property bool googleAuthRequired: googleAuthRequiredAccounts.length > 0
 
   property var rawConfig: ({})
   property bool configFileExists: false
@@ -105,8 +109,9 @@ Item {
     googleProc.running = true
   }
 
-  function googleLogin() { googleRun(["login"]) }
-  function googleLogout() { googleRun(["logout"]) }
+  // account "auto" adds a new account keyed by its address.
+  function googleLogin(account) { googleRun(["login", "--account", String(account || "auto")]) }
+  function googleLogout(account) { googleRun(["logout", "--account", String(account || "default")]) }
   function googleImportClient() { googleRun(["setup"]) }
   function googleRefreshStatus() {
     if (!googleStatusProc.running) googleStatusProc.running = true

@@ -128,6 +128,34 @@ class LoginTests(unittest.TestCase):
         self.login(fake, secrets, opener)
         self.assertEqual(len(g.read_json(self.config, {})["calendars"]), 2)
 
+    def test_add_account_auto_keys_by_email_and_finds_chrome_profile(self):
+        chrome = os.path.join(self.tmp.name, "cfg", "google-chrome")
+        os.makedirs(chrome)
+        with open(os.path.join(chrome, "Local State"), "w") as fh:
+            json.dump({"profile": {"info_cache": {"Default": {"user_name": "other@example.com"},
+                                                  "Profile 2": {"user_name": "Me@Example.com"}}}}, fh)
+        old_env = os.environ.get("XDG_CONFIG_HOME")
+        os.environ["XDG_CONFIG_HOME"] = os.path.join(self.tmp.name, "cfg")
+        try:
+            fake, secrets = FakeGoogle(), FakeSecrets()
+            opener, _ = self.browser()
+            g.login("auto", http_client=fake, opener=opener, secrets_store=secrets, client_path=self.client_path,
+                    accounts_path=self.accounts, config_path=self.config, timeout=10)
+            self.assertIn("me@example.com", secrets.data)
+            entry = [c for c in g.read_json(self.config, {})["calendars"] if c.get("type") == "google"][0]
+            self.assertEqual(entry["account"], "me@example.com")
+            self.assertEqual(entry["chromeProfile"], "Profile 2")
+            # Adding the same address again reuses its key instead of duplicating it.
+            opener, _ = self.browser()
+            g.login("auto", http_client=fake, opener=opener, secrets_store=secrets, client_path=self.client_path,
+                    accounts_path=self.accounts, config_path=self.config, timeout=10)
+            self.assertEqual(list(g.read_json(self.accounts, {}).keys()), ["me@example.com"])
+        finally:
+            if old_env is None:
+                os.environ.pop("XDG_CONFIG_HOME", None)
+            else:
+                os.environ["XDG_CONFIG_HOME"] = old_env
+
     def test_state_mismatch_is_rejected(self):
         opener, _ = self.browser(state="forged")
         with self.assertRaisesRegex(g.GoogleError, "state mismatch"):
