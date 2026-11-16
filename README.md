@@ -123,7 +123,7 @@ Settings use MeetingBar's names and default values.
 | `pastEventsAppereance` | `show_inactive` | `show_inactive`, `hide` |
 | `joinEventNotification` / `…Time` | `true` / `0` | notification N seconds before start |
 | `endOfEventNotification` / `…Time` | `true` / `0` | notification N seconds before end |
-| `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start |
+| `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start. As in MeetingBar, this includes invitations you have not answered or answered "maybe"; set `showPendingEvents` / `showTentativeEvents` to `hide` to leave those out (which also hides them from the menu) |
 | `actionGraceSeconds` | `300` | still fire this late, e.g. after suspend |
 | `openMeetingsIn` | `webapp` | `webapp` (`omarchy-launch-webapp`), `browser` (`xdg-open`) |
 | `chromeProfile` | `""` | Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Also settable per calendar. Empty = last used profile |

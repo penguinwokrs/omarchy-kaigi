@@ -98,13 +98,21 @@ test("due actions fire once per identity inside the grace window", () => {
   assert.deepEqual(M.dueActions([e], cfg, e.end, fired).map(d => d.kind), ["eventEnd"])
 })
 
-test("auto-join needs a link and skips declined/all-day/personal-hidden", () => {
+test("auto-join follows MeetingBar: link required, declined/all-day skipped, filters only on hide", () => {
   const cfg = { automaticEventJoin: true, joinEventNotification: false, endOfEventNotification: false }
   const at = now + 5 * MIN
   const events = [ev(5, 30, { link: null }), ev(5, 30, { participation: "declined" }), ev(5, 30, { allDay: true }),
     ev(5, 30, { hasAttendees: false })]
   assert.equal(M.dueActions(events, cfg, at, {}).length, 1)
-  assert.equal(M.dueActions(events, Object.assign({ personalEventsAppereance: "hide" }, cfg), at, {}).length, 0)
+  // personalEventsAppereance is a menu setting only; MeetingBar still auto-joins.
+  assert.equal(M.dueActions(events, Object.assign({ personalEventsAppereance: "hide" }, cfg), at, {}).length, 1)
+  // Pending invitations auto-join by default, and stop only with showPendingEvents: "hide".
+  const pending = [ev(5, 30, { participation: "pending" })]
+  assert.equal(M.dueActions(pending, cfg, at, {}).length, 1)
+  assert.equal(M.dueActions(pending, Object.assign({ showPendingEvents: "show_inactive" }, cfg), at, {}).length, 1)
+  assert.equal(M.dueActions(pending, Object.assign({ showPendingEvents: "hide" }, cfg), at, {}).length, 0)
+  const tentative = [ev(5, 30, { participation: "tentative" })]
+  assert.equal(M.dueActions(tentative, Object.assign({ showTentativeEvents: "hide" }, cfg), at, {}).length, 0)
 })
 
 test("launchable URLs and notification text", () => {

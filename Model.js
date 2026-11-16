@@ -220,6 +220,24 @@ function menuSections(events, config, now) {
 
 // --- actions ---------------------------------------------------------------
 
+// EventFiltering.filter: the list MeetingBar keeps after its display filters
+// (title regexes are applied by bin/kaigi-events). Notifications and auto-join
+// are planned from this list only, so "hide" settings also stop them, while
+// show_inactive / show_underlined do not.
+function passesEventFilter(event, config) {
+  config = withDefaults(config)
+  if (event.allDay) {
+    if (config.allDayEvents === "hide") return false
+    if (config.allDayEvents === "show_with_meeting_link_only" && !hasLink(event)) return false
+  } else if (config.nonAllDayEvents === "hide_without_meeting_link" && !hasLink(event)) {
+    return false
+  }
+  if (event.participation === "pending" && config.showPendingEvents === "hide") return false
+  if (event.participation === "tentative" && config.showTentativeEvents === "hide") return false
+  if (event.participation === "declined" && config.declinedEventsAppereance === "hide") return false
+  return true
+}
+
 function actionIdentity(event, kind, offsetSeconds) {
   var anchor = kind === "eventEnd" ? event.end : event.start
   return event.id + "|" + Math.floor(anchor / 1000) + "|" + kind + "|" + offsetSeconds
@@ -239,8 +257,9 @@ function dueActions(events, config, now, fired) {
   ]
   for (var i = 0; i < (events || []).length; i++) {
     var e = events[i]
+    if (!passesEventFilter(e, config)) continue
+    // NotificationPlanner.shouldConsider
     if (isDismissed(e, config) || e.status === "cancelled" || e.participation === "declined" || e.allDay) continue
-    if (!menuAppearance(e, config, Math.min(now, e.start))) continue
     for (var p = 0; p < plans.length; p++) {
       var plan = plans[p]
       if (!plan.enabled) continue
@@ -289,6 +308,7 @@ if (typeof module !== "undefined") {
     menuAppearance: menuAppearance,
     menuSections: menuSections,
     dueActions: dueActions,
+    passesEventFilter: passesEventFilter,
     actionIdentity: actionIdentity,
     pruneFired: pruneFired,
     launchableUrl: launchableUrl,
