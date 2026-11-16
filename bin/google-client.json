@@ -1,0 +1,12 @@
+{
+  "installed": {
+    "client_id": "89899295457-gttvgmprsneuieemae0mmg9gktpci2cq.apps.googleusercontent.com",
+    "project_id": "lunar-goal-514904-r5",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "client_secret": "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",
+    "redirect_uris": [
+      "http://localhost"
+    ]
+  }
+}

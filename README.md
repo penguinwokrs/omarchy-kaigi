@@ -49,12 +49,20 @@ Then open the popup and follow the Google sign-in steps below.
 ## Calendars: Google sign-in
 
 Kaigi talks to the Google Calendar API, like MeetingBar's "Google Calendar
-API" provider does. MeetingBar's OAuth client ID is compiled into its release
-builds and cannot be reused, so you create your own once. It's free: the
-Calendar API costs nothing and needs no billing account, and Kaigi uses a few
-hundred requests a day against a quota of 1,000,000.
+API" provider does, and ships its own OAuth client (`bin/google-client.json`),
+as MeetingBar does. Open the popup, press **Googleでログイン / Sign in with
+Google**, pick your account and allow read access. That's all.
 
-### One-time setup (about 5 minutes)
+> Kaigi's Google verification is in progress. Until it completes, Google shows
+> a "Google hasn't verified this app" page during sign-in (choose *Advanced →
+> Go to Kaigi*), and the shared client accepts at most 100 users. You can use
+> your own client instead, as described below.
+
+### Optional: use your own OAuth client (about 5 minutes)
+
+It's free: the Calendar API costs nothing and needs no billing account, and
+Kaigi uses a few hundred requests a day against a quota of 1,000,000. A client
+you import takes precedence over the bundled one.
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), create a
    project, for example `kaigi`.

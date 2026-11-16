@@ -47,11 +47,17 @@ cd omarchy-kaigi
 ## カレンダー：Googleでログイン
 
 Kaigi は、MeetingBar の「Google Calendar API」連携と同じように Google Calendar API を使います。
-MeetingBar の OAuth クライアントIDは配布版のビルドに埋め込まれていて流用できないので、
-自分用のクライアントを一度だけ作ります。料金はかかりません。Calendar API は無料で、
-課金アカウントも要りません。Kaigi が使うのは1日数百リクエストほどで、上限の100万には遠く届きません。
+MeetingBar と同じく、Kaigi 自身の OAuth クライアント（`bin/google-client.json`）を同梱しています。
+パネルを開いて **Googleでログイン** を押し、アカウントを選んで読み取りを許可するだけで使えます。
 
-### 最初だけの準備（5分ほど）
+> Kaigi は現在 Google の審査中です。審査が終わるまでは、ログイン時に「このアプリは Google で確認されていません」と
+> 表示されます（「詳細 → Kaigi に移動」で進めます）。また、同梱のクライアントを使えるのは100人までです。
+> 下の手順で自分用のクライアントを使うこともできます。
+
+### 任意：自分用の OAuth クライアントを使う（5分ほど）
+
+料金はかかりません。Calendar API は無料で、課金アカウントも要りません。Kaigi が使うのは1日数百リクエストほどで、
+上限の100万には遠く届きません。自分で取り込んだクライアントは、同梱のクライアントより優先されます。
 
 1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作ります（名前は `kaigi` など）。
 2. **API とサービス → ライブラリ → Google Calendar API** を開いて **有効にする** を押します。
