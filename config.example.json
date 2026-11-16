@@ -20,7 +20,7 @@
   "automaticEventJoinTime": 0,
   "actionGraceSeconds": 300,
 
-  "openMeetingsIn": "webapp",
+  "openMeetingsIn": "browser",
   "chromeProfile": "",
   "refreshMinutes": 5,
   "customRegexes": [],

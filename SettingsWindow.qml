@@ -309,9 +309,9 @@ Item {
       ChoiceRow {
         key: "openMeetingsIn"
         label: strings.t("settings.openIn")
-        options: [{ value: "webapp", label: strings.t("settings.openIn.webapp") }, { value: "browser", label: strings.t("settings.openIn.browser") }]
+        options: [{ value: "browser", label: strings.t("settings.openIn.browser") }, { value: "webapp", label: strings.t("settings.openIn.webapp") }]
       }
-      ChoiceRow { key: "chromeProfile"; label: strings.t("settings.defaultProfile"); options: root.profileOptions; enabled: root.str("openMeetingsIn") !== "browser" }
+      ChoiceRow { key: "chromeProfile"; label: strings.t("settings.defaultProfile"); options: root.profileOptions; enabled: root.str("openMeetingsIn") === "webapp" }
       Note { text: strings.t("settings.profileNote") }
     }
   }
@@ -393,6 +393,8 @@ Item {
             label: strings.t("settings.accountProfile")
             value: String(acct.modelData.chromeProfile || "")
             options: root.profileOptions
+            enabled: root.str("openMeetingsIn") === "webapp"
+            opacity: enabled ? 1 : 0.4
             foreground: root.fg
             fontFamily: root.fontFamily
             onChanged: function(v) { root.service.setCalendarProfile(acct.modelData.configIndex, v) }

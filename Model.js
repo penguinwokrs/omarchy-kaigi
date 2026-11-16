@@ -28,7 +28,7 @@ var DEFAULT_CONFIG = {
   automaticEventJoin: false,
   automaticEventJoinTime: 0,                  // seconds before start
   actionGraceSeconds: 300,                    // still fire this late (suspend, shell restart)
-  openMeetingsIn: "webapp",                   // webapp | browser
+  openMeetingsIn: "browser",                  // browser (MeetingBar's default) | webapp
   refreshMinutes: 5,
   dismissedEvents: []
 }

@@ -125,6 +125,11 @@ test("launchable URLs and notification text", () => {
   assert.equal(M.plainNotificationText('<img src="https://t">&'), '&lt;img src="https://t"&gt;&amp;')
 })
 
+test("meetings open in the default browser by default, like MeetingBar", () => {
+  assert.equal(M.withDefaults({}).openMeetingsIn, "browser")
+  assert.equal(M.withDefaults({ openMeetingsIn: "webapp" }).openMeetingsIn, "webapp")
+})
+
 test("fired identities older than two days are pruned", () => {
   const out = M.pruneFired({ a: now, b: now - 3 * 24 * 60 * MIN }, now)
   assert.deepEqual(Object.keys(out), ["a"])
