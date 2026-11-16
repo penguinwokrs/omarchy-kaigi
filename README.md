@@ -1,5 +1,7 @@
 # Kaigi for Omarchy
 
+English | [日本語](README.ja.md)
+
 > An unofficial port; not affiliated with or endorsed by MeetingBar.
 
 A port of [MeetingBar](https://github.com/leits/MeetingBar) to the Omarchy shell.
@@ -15,14 +17,14 @@ and ends, and can open the meeting by itself when it starts.
 │ ▍ 10:00 – 10:30  過去の打ち合わせ       │  (past: dimmed)
 │ ▍ 12:31 – 13:01  Kaigi テスト定例   󰕧 │
 │ ▍ 13:30 – 14:00  ~~辞退した会議~~      │  (declined: struck through)
-│ 󰑐 更新   󰒓 カレンダー                 │
+│ 󰑐 更新   󰒓 設定                       │
 └──────────────────────────────────────┘
 ```
 
 ## Install
 
 ```bash
-git clone <this repo> ~/projects/github.com/penguinwokrs/omarchy-kaigi
+git clone https://github.com/penguinwokrs/omarchy-kaigi.git ~/projects/github.com/penguinwokrs/omarchy-kaigi
 cd ~/projects/github.com/penguinwokrs/omarchy-kaigi
 ./install.sh            # symlinks into ~/.config/omarchy/plugins and enables it
 ```
@@ -56,19 +58,27 @@ hundred requests a day against a quota of 1,000,000.
      after 7 days. You don't need verification for your own use, but sign-in
      shows a "Google hasn't verified this app" page. Click *Advanced → Go to …*
      to continue.
+   - Publishing to production can require a homepage and a privacy policy
+     link on the Branding page. This repository's URL and
+     [PRIVACY.md](PRIVACY.md) work for that.
 4. Open **Credentials → Create credentials → OAuth client ID** and choose the
    **Desktop app** type. Then click **Download JSON**.
 5. In the Kaigi popup, press **ダウンロードしたJSONを取り込む / Import
-   downloaded JSON**. This copies the newest `~/Downloads/client_secret_*.json`
-   to `~/.config/kaigi/google-client.json` (0600). You can also run
+   downloaded JSON**. This copies the newest downloaded client JSON
+   (`client_secret_*.json` or `*.apps.googleusercontent.com.json`) from
+   `~/Downloads` to `~/.config/kaigi/google-client.json` (0600). You can also run
    `bin/kaigi-google setup <file>`.
 6. Press **Googleでログイン / Sign in with Google**, then approve access in the
    browser that opens.
 
-When sign-in succeeds, Kaigi adds `{"type": "google", "account": "default"}`
-to `config.json` and shows the calendars that are checked (selected) in Google
-Calendar. To choose calendars yourself, list their ids with
-`bin/kaigi-google calendars` and put them in `"calendarIds"`.
+When sign-in succeeds, Kaigi adds a Google entry to `config.json` and reads
+the calendars that are checked (selected) in Google Calendar. Pick other
+calendars on the settings window's Calendars tab.
+
+You can add more accounts with **アカウントを追加 / Add account** in the popup
+or the settings window. Each account is keyed by its address. If a Chrome
+profile is signed in with that address, Kaigi uses it to open that account's
+meetings.
 
 ### How it works
 
@@ -86,11 +96,12 @@ Calendar. To choose calendars yourself, list their ids with
   `hangoutLink` first, then the location and the description. Your RSVP comes
   from your own entry in `attendees` (`self: true`). Working-location entries
   are skipped.
-- **Sign-out:** `ログアウト / Sign out` in the popup, or
-  `bin/kaigi-google logout`, revokes the token, removes it from the keyring
+- **Sign-out:** `ログアウト / Sign out` in the popup or the settings window,
+  or `bin/kaigi-google logout --account <name>`, revokes the token, removes it from the keyring
   and deletes the cache.
 - **Expired sign-in:** if Google rejects the sign-in (revoked, or 7 days in
-  Testing), the popup shows **Googleに再ログイン / Sign in to Google again**.
+  Testing), the popup shows a **再ログイン / Sign in again** button for that
+  account only.
 
 ### Alternative: iCalendar feeds
 
@@ -168,11 +179,17 @@ only when `config.json` doesn't set them:
 
 - **Bar:** left-click opens the popup, middle-click joins the next meeting,
   right-click refetches the feeds.
-- **Popup:** ↑/↓ (or k/j) to choose an event, Enter to join, `n` to join the next meeting,
-  `r` to refresh, Esc to close.
-- **IPC:** `omarchy-shell kaigi joinNext` (bind it to a key),
-  `omarchy-shell kaigi refresh`, `omarchy-shell kaigi next`, `omarchy-shell kaigi googleLogin`,
-  `omarchy-shell penguinwokrs.kaigi toggle`.
+- **Popup:** ↑/↓ (or k/j) to choose an event, Enter to join it, `n` to join
+  the next meeting, `r` to refresh, Esc to close. Enter works only when an
+  event is selected.
+- **IPC:**
+  - `omarchy-shell kaigi joinNext` (bind it to a key)
+  - `omarchy-shell kaigi refresh`
+  - `omarchy-shell kaigi next`
+  - `omarchy-shell kaigi googleLogin`
+  - `omarchy-shell kaigi openSettings`
+  - `omarchy-shell kaigi set <key> <json>`
+  - `omarchy-shell penguinwokrs.kaigi toggle`
 
 ## How it works
 
@@ -189,13 +206,15 @@ only when `config.json` doesn't set them:
 - Only URLs that match a known service (or your `customRegexes`) with an
   `https`, `http`, `zoommtg` or `discord` scheme are opened. They are passed as
   argv, never through a shell.
-- `Panel.qml` is the bar widget and popup. `Model.js` holds the ported selection,
-  formatting and scheduling logic.
+- `Panel.qml` is the bar widget and popup, and `SettingsWindow.qml` is the
+  settings window. `Model.js` holds the ported selection, formatting and
+  scheduling logic.
 
 ## Development
 
 Saving files under the plugin folder hot-reloads the bar widget. Changes to
-`Service.qml` take effect only after `omarchy restart shell`.
+`Service.qml` and `SettingsWindow.qml` take effect only after
+`omarchy restart shell`.
 
 ## Tests
 
