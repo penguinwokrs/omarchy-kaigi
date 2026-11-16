@@ -163,6 +163,11 @@ class LoginTests(unittest.TestCase):
         dest = os.path.join(self.tmp.name, "cfg", "google-client.json")
         self.assertEqual(g.setup_client(None, dest, dl), new)
         self.assertEqual(oct(os.stat(dest).st_mode & 0o777), "0o600")
+        newest = os.path.join(dl, "123-abc.apps.googleusercontent.com.json")
+        with open(newest, "w") as fh:
+            json.dump(CLIENT, fh)
+        os.utime(newest, (3000, 3000))
+        self.assertEqual(g.setup_client(None, dest, dl), newest)
         with open(old, "w") as fh:
             json.dump({"installed": {"client_id": "not-google"}}, fh)
         with self.assertRaises(g.ClientMissing):

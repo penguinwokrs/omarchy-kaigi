@@ -126,15 +126,22 @@ Item {
 
   // ---- joining --------------------------------------------------------------
 
-  function launchArgv(url) {
+  // The Chrome profile that holds the right Google sign-in, from
+  // chromeProfile in config.json (per calendar or global). Without one Chrome
+  // uses whichever profile was used last.
+  function launchArgv(url, profile) {
     var https = /^https?:\/\//.test(url)
-    if (https && root.config.openMeetingsIn !== "browser") return ["omarchy-launch-webapp", url]
+    if (https && root.config.openMeetingsIn !== "browser") {
+      var argv = ["omarchy-launch-webapp", url]
+      if (/^[A-Za-z0-9 _.-]{1,40}$/.test(String(profile || ""))) argv.push("--profile-directory=" + profile)
+      return argv
+    }
     return ["xdg-open", url]
   }
 
   function join(event) {
     if (!event || !event.link || !Model.launchableUrl(event.link.url)) return false
-    Util.execArgv(launchArgv(event.link.url))
+    Util.execArgv(launchArgv(event.link.url, event.browserProfile))
     return true
   }
 
@@ -162,7 +169,7 @@ Item {
     var argv = ["omarchy-notification-send", "--app-name", "Kaigi", "-g", "\uDB80\uDCF0", "-u", "normal",
                 title, Model.plainNotificationText(body)]
     if (event.link && Model.launchableUrl(event.link.url))
-      argv = argv.concat(["--action", strings.t("join")]).concat(launchArgv(event.link.url))
+      argv = argv.concat(["--action", strings.t("join")]).concat(launchArgv(event.link.url, event.browserProfile))
     Util.execArgv(argv)
   }
 

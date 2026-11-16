@@ -126,6 +126,7 @@ Settings use MeetingBar's names and default values.
 | `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start |
 | `actionGraceSeconds` | `300` | still fire this late, e.g. after suspend |
 | `openMeetingsIn` | `webapp` | `webapp` (`omarchy-launch-webapp`), `browser` (`xdg-open`) |
+| `chromeProfile` | `""` | Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Also settable per calendar. Empty = last used profile |
 | `customRegexes` | `[]` | extra link patterns, tried last |
 | `filterEventRegexes` | `[]` | hide events whose title matches |
 | `dismissedEvents` | `[]` | event ids to ignore |

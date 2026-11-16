@@ -131,13 +131,16 @@ def setup_client(source=None, dest=CLIENT_PATH, downloads=os.path.join(HOME, "Do
         cands = []
         try:
             for name in os.listdir(downloads):
-                if name.startswith("client_secret") and name.endswith(".json"):
+                # Cloud Console names it client_secret_<id>.json, or just
+                # <id>.apps.googleusercontent.com(.json) on newer pages.
+                if (name.startswith("client_secret") and name.endswith(".json")) or \
+                        name.endswith((".apps.googleusercontent.com", ".apps.googleusercontent.com.json")):
                     p = os.path.join(downloads, name)
                     cands.append((os.path.getmtime(p), p))
         except OSError:
             pass
         if not cands:
-            raise ClientMissing(f"no client_secret_*.json in {downloads}")
+            raise ClientMissing(f"no downloaded OAuth client JSON in {downloads}")
         source = max(cands)[1]
     load_client(source)  # validates
     with open(source, encoding="utf-8") as fh:
@@ -264,7 +267,7 @@ def login(account="default", http_client=None, opener=default_opener, secrets_st
     url = AUTH_URL + "?" + urllib.parse.urlencode({
         "client_id": client["client_id"], "redirect_uri": redirect, "response_type": "code",
         "scope": SCOPE, "code_challenge": challenge, "code_challenge_method": "S256",
-        "state": state, "access_type": "offline", "prompt": "consent",
+        "state": state, "access_type": "offline", "prompt": "select_account consent",
     })
     progress({"event": "open", "url": url})
     opener(url)

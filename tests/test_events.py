@@ -227,7 +227,8 @@ class MainTests(unittest.TestCase):
                              vevent(UID="2", SUMMARY="Lunch", DTSTART="20261116T030000Z", DTEND="20261116T040000Z")))
             cfg = os.path.join(d, "config.json")
             with open(cfg, "w") as fh:
-                json.dump({"calendars": [{"name": "Local", "path": ics}], "filterEventRegexes": ["^Lunch$"]}, fh)
+                json.dump({"calendars": [{"name": "Local", "path": ics, "chromeProfile": "Profile 3"}],
+                           "chromeProfile": "Default", "filterEventRegexes": ["^Lunch$"]}, fh)
             import contextlib
             import io
             buf = io.StringIO()
@@ -236,6 +237,7 @@ class MainTests(unittest.TestCase):
             out = json.loads(buf.getvalue())
             self.assertTrue(out["configured"])
             self.assertEqual([e["title"] for e in out["events"]], ["Keep"])
+            self.assertEqual(out["events"][0]["browserProfile"], "Profile 3")
 
     def test_missing_config_is_unconfigured(self):
         import contextlib

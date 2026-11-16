@@ -775,6 +775,10 @@ def main(argv=None):
         emails = set(base_emails)
         if cal.get("email"):
             emails.add(str(cal["email"]).lower())
+        profile = str(cal.get("chromeProfile") or config.get("chromeProfile") or "")
+        if not re.fullmatch(r"[A-Za-z0-9 _.-]{1,40}", profile):
+            profile = ""
+        start_count = len(events)
         if cal.get("type") == "google":
             account = str(cal.get("account") or "default")
             snap, gerr = google.load(account, cal, window_start, window_end, max_age, args.force)
@@ -789,6 +793,8 @@ def main(argv=None):
                                   if e["end"] > to_ms(window_start) and e["start"] < to_ms(window_end))
                 except Exception as exc:
                     result["errors"].append({"calendar": name, "message": f"parse failed ({type(exc).__name__})"})
+            for ev in events[start_count:]:
+                ev["browserProfile"] = profile
             continue
         url = str(cal.get("url") or "")
         if url and not emails and feed_email(url):
@@ -810,6 +816,7 @@ def main(argv=None):
             try:
                 for ev in collect(text, name, emails, custom, filters, window_start, window_end):
                     ev["color"] = clip(str(cal.get("color", "")), 16)
+                    ev["browserProfile"] = profile
                     events.append(ev)
             except Exception as exc:  # a malformed feed must not take down the others
                 result["errors"].append({"calendar": name, "message": f"parse failed ({type(exc).__name__})"})

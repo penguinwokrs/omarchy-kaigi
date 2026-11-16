@@ -21,6 +21,7 @@
   "actionGraceSeconds": 300,
 
   "openMeetingsIn": "webapp",
+  "chromeProfile": "",
   "refreshMinutes": 5,
   "customRegexes": [],
   "filterEventRegexes": [],
