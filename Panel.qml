@@ -124,9 +124,10 @@ Panel {
     cursor = Math.max(0, Math.min(flatRows.length - 1, cursor + dy))
   }
 
+  // Enter joins only the row the keyboard cursor is on: a stray Enter typed
+  // while the popup grabs focus must not start a meeting.
   function activateCursor() {
     if (cursor >= 0 && cursor < flatRows.length) join(flatRows[cursor].event)
-    else if (nextJoinable) join(nextJoinable)
   }
 
   onOpenedChanged: {

@@ -97,6 +97,7 @@ Item {
 
   component SwitchRow: Toggle {
     property string key: ""
+    objectName: "switch:" + key
     property bool fallback: false
     width: root.rowWidth
     checked: root.on(key, fallback)
@@ -108,6 +109,7 @@ Item {
   component ChoiceRow: Dropdown {
     opacity: enabled ? 1 : 0.4
     property string key: ""
+    objectName: "choice:" + key
     property bool numeric: false
     width: root.rowWidth
     value: root.str(key)
@@ -119,6 +121,7 @@ Item {
   component NumberRow: NumberField {
     opacity: enabled ? 1 : 0.4
     property string key: ""
+    objectName: "number:" + key
     property int fallback: 0
     value: root.num(key, fallback)
     foreground: root.fg
@@ -152,6 +155,7 @@ Item {
         anchors.margins: Style.space(6)
         TextArea {
           id: area
+          objectName: "list:" + editor.key
           textFormat: TextEdit.PlainText
           color: root.fg
           font.family: root.fontFamily
@@ -365,6 +369,7 @@ Item {
             model: acct.modelData.calendars
             Toggle {
               required property var modelData
+              objectName: "calendar:" + acct.modelData.account + ":" + modelData.id
               width: root.rowWidth
               label: String(modelData.summary || modelData.id)
               description: modelData.primary ? strings.t("settings.primary") : ""
@@ -381,6 +386,7 @@ Item {
             }
           }
           Dropdown {
+            objectName: "profile:" + acct.modelData.account
             width: root.rowWidth
             label: strings.t("settings.accountProfile")
             value: String(acct.modelData.chromeProfile || "")
@@ -425,6 +431,7 @@ Item {
 
       Heading { text: strings.t("settings.period") }
       ButtonGroup {
+        objectName: "period"
         value: root.str("showEventsForPeriod") || "today"
         options: [{ value: "today", label: strings.t("today") }, { value: "today_tomorrow", label: strings.t("settings.todayTomorrow") }]
         foreground: root.fg
