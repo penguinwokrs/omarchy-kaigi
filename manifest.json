@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "id": "penguinwokrs.kaigi",
+  "name": "Kaigi",
+  "version": "0.1.0",
+  "author": "penguinwokrs",
+  "license": "Apache-2.0",
+  "description": "Unofficial MeetingBar-style meeting bar for Omarchy: next meeting and countdown, one-click join, start/end notifications and auto-join, synced from Google Calendar.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Kaigi",
+    "description": "Next meeting with countdown; click for today's events",
+    "category": "Time",
+    "allowMultiple": false,
+    "defaultSection": "centerEnd",
+    "defaults": {
+      "eventTitleFormat": "show",
+      "eventTimeFormat": "show",
+      "statusbarEventTitleLength": 30,
+      "menuEventTitleLength": 50,
+      "showEventEndTime": true,
+      "showEventMaxTimeUntilEventEnabled": false,
+      "showEventMaxTimeUntilEventThreshold": 60
+    },
+    "schema": [
+      {
+        "key": "eventTitleFormat",
+        "type": "enum",
+        "label": "Event title in the bar",
+        "options": [
+          "show",
+          "generic",
+          "dot",
+          "none"
+        ],
+        "defaultValue": "show"
+      },
+      {
+        "key": "eventTimeFormat",
+        "type": "enum",
+        "label": "Time until/left in the bar",
+        "options": [
+          "show",
+          "hide"
+        ],
+        "defaultValue": "show"
+      },
+      {
+        "key": "statusbarEventTitleLength",
+        "type": "integer",
+        "label": "Bar title length",
+        "min": 5,
+        "max": 55,
+        "step": 1,
+        "defaultValue": 30
+      },
+      {
+        "key": "menuEventTitleLength",
+        "type": "integer",
+        "label": "Menu title length",
+        "min": 10,
+        "max": 120,
+        "step": 1,
+        "defaultValue": 50
+      },
+      {
+        "key": "showEventEndTime",
+        "type": "boolean",
+        "label": "Show end time in the menu",
+        "defaultValue": true
+      },
+      {
+        "key": "showEventMaxTimeUntilEventEnabled",
+        "type": "boolean",
+        "label": "Only show events starting soon",
+        "defaultValue": false
+      },
+      {
+        "key": "showEventMaxTimeUntilEventThreshold",
+        "type": "integer",
+        "label": "…within (minutes)",
+        "min": 5,
+        "max": 720,
+        "step": 5,
+        "defaultValue": 60
+      }
+    ]
+  }
+}

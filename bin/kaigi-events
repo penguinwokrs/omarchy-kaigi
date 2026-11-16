@@ -1,0 +1,824 @@
+#!/usr/bin/env python3
+"""kaigi-events: read iCalendar feeds and print upcoming events as JSON.
+
+The Omarchy Kaigi plugin runs this every minute. It is standard-library
+only (no dateutil/icalendar on a stock Omarchy install), so the parts of
+RFC 5545 that calendars actually use are implemented here: line unfolding,
+TZID/UTC/floating/all-day times, RRULE (DAILY/WEEKLY/MONTHLY/YEARLY with
+INTERVAL, COUNT, UNTIL, BYDAY, BYMONTHDAY, BYMONTH, BYSETPOS, WKST), RDATE,
+EXDATE and RECURRENCE-ID overrides.
+
+Meeting-link detection follows MeetingBar's MeetingLinkDetector: sources are
+ranked conference data > URL > location > notes > HTML-stripped notes >
+custom regex; within a source a conferencing service beats YouTube/Vimeo,
+then the earliest match, then the longer URL.
+
+Config: ~/.config/kaigi/config.json (see README). Feed URLs are secrets
+and are never printed.
+"""
+
+import argparse
+import calendar as calmod
+import datetime as dt
+import hashlib
+import html
+import json
+import os
+import re
+import sys
+import time
+import urllib.parse
+import urllib.request
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, HERE)  # -I drops the script dir; kaigi_google lives beside us
+import kaigi_google as google  # noqa: E402
+HOME = os.path.expanduser("~")
+DEFAULT_CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config")), "kaigi", "config.json")
+CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "kaigi")
+
+MAX_FEED_BYTES = 20 * 1024 * 1024
+FETCH_TIMEOUT = 15
+MAX_TITLE = 300
+MAX_TEXT = 4000
+MAX_EVENTS = 500
+MAX_INSTANCES_PER_RULE = 100000
+
+UTC = dt.timezone.utc
+
+
+def local_tz():
+    try:
+        name = os.environ.get("TZ")
+        if name:
+            return ZoneInfo(name.lstrip(":"))
+        link = os.path.realpath("/etc/localtime")
+        if "zoneinfo/" in link:
+            return ZoneInfo(link.split("zoneinfo/", 1)[1])
+    except (ZoneInfoNotFoundError, ValueError):
+        pass
+    return dt.datetime.now().astimezone().tzinfo
+
+
+LOCAL = local_tz()
+
+# Outlook/Exchange feeds name zones the Windows way.
+WINDOWS_TZ = {
+    "Tokyo Standard Time": "Asia/Tokyo",
+    "Korea Standard Time": "Asia/Seoul",
+    "China Standard Time": "Asia/Shanghai",
+    "Singapore Standard Time": "Asia/Singapore",
+    "India Standard Time": "Asia/Kolkata",
+    "W. Europe Standard Time": "Europe/Berlin",
+    "Romance Standard Time": "Europe/Paris",
+    "GMT Standard Time": "Europe/London",
+    "Central Europe Standard Time": "Europe/Budapest",
+    "E. Europe Standard Time": "Europe/Chisinau",
+    "FLE Standard Time": "Europe/Kiev",
+    "Russian Standard Time": "Europe/Moscow",
+    "Eastern Standard Time": "America/New_York",
+    "Central Standard Time": "America/Chicago",
+    "Mountain Standard Time": "America/Denver",
+    "Pacific Standard Time": "America/Los_Angeles",
+    "AUS Eastern Standard Time": "Australia/Sydney",
+    "New Zealand Standard Time": "Pacific/Auckland",
+    "UTC": "UTC",
+    "Coordinated Universal Time": "UTC",
+}
+
+
+def resolve_tz(tzid):
+    if not tzid:
+        return LOCAL
+    name = tzid.strip().strip('"')
+    if name.startswith("/"):
+        # "/mozilla.org/20050126_1/Europe/Berlin" style ids.
+        parts = name.strip("/").split("/")
+        name = "/".join(parts[-2:]) if len(parts) >= 2 else parts[-1]
+    name = WINDOWS_TZ.get(name, name)
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return LOCAL
+
+
+# --------------------------------------------------------------------------
+# iCalendar parsing
+
+
+def unfold(text):
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return re.sub(r"\n[ \t]", "", text).split("\n")
+
+
+def split_property(line):
+    """'NAME;P=V;Q="x:y":value' -> (NAME, {P: V, Q: x:y}, value)."""
+    i, n, quoted = 0, len(line), False
+    while i < n:
+        c = line[i]
+        if c == '"':
+            quoted = not quoted
+        elif c == ":" and not quoted:
+            break
+        i += 1
+    head, value = line[:i], line[i + 1:]
+    parts, buf, quoted = [], "", False
+    for c in head:
+        if c == '"':
+            quoted = not quoted
+            buf += c
+        elif c == ";" and not quoted:
+            parts.append(buf)
+            buf = ""
+        else:
+            buf += c
+    parts.append(buf)
+    name = parts[0].upper()
+    params = {}
+    for p in parts[1:]:
+        if "=" in p:
+            k, v = p.split("=", 1)
+            params[k.upper()] = v.strip('"')
+    return name, params, value
+
+
+def unescape_text(value):
+    out, i = [], 0
+    while i < len(value):
+        c = value[i]
+        if c == "\\" and i + 1 < len(value):
+            nxt = value[i + 1]
+            out.append("\n" if nxt in "nN" else nxt)
+            i += 2
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def parse_components(text):
+    """Return a list of VEVENT dicts: {NAME: [(params, value), ...]}."""
+    events, stack = [], []
+    for line in unfold(text):
+        if not line:
+            continue
+        name, params, value = split_property(line)
+        if name == "BEGIN":
+            stack.append((value.upper(), {}))
+            continue
+        if name == "END":
+            if stack:
+                kind, props = stack.pop()
+                if kind == "VEVENT":
+                    events.append(props)
+            continue
+        if stack:
+            stack[-1][1].setdefault(name, []).append((params, value))
+    return events
+
+
+def first(props, name):
+    vals = props.get(name)
+    return vals[0] if vals else (None, None)
+
+
+def parse_dt(params, value):
+    """Return (datetime_aware, is_date)."""
+    value = value.strip()
+    if params.get("VALUE", "").upper() == "DATE" or re.fullmatch(r"\d{8}", value):
+        d = dt.datetime.strptime(value[:8], "%Y%m%d")
+        return d.replace(tzinfo=LOCAL), True
+    m = re.fullmatch(r"(\d{8})T(\d{6})(Z?)", value)
+    if not m:
+        raise ValueError("bad date-time")
+    naive = dt.datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S")
+    if m.group(3):
+        return naive.replace(tzinfo=UTC), False
+    return naive.replace(tzinfo=resolve_tz(params.get("TZID"))), False
+
+
+def parse_dt_list(params, value):
+    out = []
+    for v in value.split(","):
+        v = v.strip()
+        if not v:
+            continue
+        if "/" in v:  # PERIOD in RDATE: take the start
+            v = v.split("/", 1)[0]
+        try:
+            out.append(parse_dt(params, v))
+        except ValueError:
+            pass
+    return out
+
+
+def parse_duration(value):
+    m = re.fullmatch(r"([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?", value.strip())
+    if not m:
+        return None
+    sign = -1 if m.group(1) == "-" else 1
+    w, d, h, mi, s = (int(x) if x else 0 for x in m.groups()[1:])
+    return sign * dt.timedelta(weeks=w, days=d, hours=h, minutes=mi, seconds=s)
+
+
+# --------------------------------------------------------------------------
+# RRULE expansion (wall-clock arithmetic in DTSTART's zone, so DST holds)
+
+WEEKDAYS = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
+
+
+def parse_rrule(value):
+    rule = {}
+    for part in value.split(";"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            rule[k.upper()] = v.strip()
+    return rule
+
+
+def parse_byday(value):
+    out = []
+    for item in value.split(","):
+        m = re.fullmatch(r"([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)", item.strip().upper())
+        if m:
+            out.append((int(m.group(1)) if m.group(1) else None, WEEKDAYS[m.group(2)]))
+    return out
+
+
+def int_list(value):
+    out = []
+    for v in (value or "").split(","):
+        try:
+            out.append(int(v))
+        except ValueError:
+            pass
+    return out
+
+
+def add_months(year, month, delta):
+    idx = year * 12 + (month - 1) + delta
+    return idx // 12, idx % 12 + 1
+
+
+def nth_weekday_days(year, month, weekday, ordinal):
+    days_in = calmod.monthrange(year, month)[1]
+    matches = [d for d in range(1, days_in + 1) if dt.date(year, month, d).weekday() == weekday]
+    if ordinal is None:
+        return matches
+    if ordinal > 0 and ordinal <= len(matches):
+        return [matches[ordinal - 1]]
+    if ordinal < 0 and -ordinal <= len(matches):
+        return [matches[ordinal]]
+    return []
+
+
+def month_days(year, month, rule, start_day, byday):
+    days_in = calmod.monthrange(year, month)[1]
+    bymonthday = int_list(rule.get("BYMONTHDAY"))
+    md = set()
+    for d in bymonthday:
+        if d < 0:
+            d = days_in + 1 + d
+        if 1 <= d <= days_in:
+            md.add(d)
+    wd = set()
+    for ordinal, weekday in byday:
+        wd.update(nth_weekday_days(year, month, weekday, ordinal))
+    if bymonthday and byday:
+        days = sorted(md & wd)
+    elif bymonthday:
+        days = sorted(md)
+    elif byday:
+        days = sorted(wd)
+    else:
+        days = [start_day] if start_day <= days_in else []
+    return [dt.date(year, month, d) for d in days]
+
+
+def apply_setpos(dates, rule):
+    setpos = int_list(rule.get("BYSETPOS"))
+    if not setpos:
+        return dates
+    out = []
+    for p in setpos:
+        if 0 < p <= len(dates):
+            out.append(dates[p - 1])
+        elif p < 0 and -p <= len(dates):
+            out.append(dates[p])
+    return sorted(set(out))
+
+
+def expand_rrule(start, is_date, rule, window_start, window_end):
+    """Yield aware datetimes of occurrences (including DTSTART) up to window_end."""
+    freq = rule.get("FREQ", "").upper()
+    if freq not in ("DAILY", "WEEKLY", "MONTHLY", "YEARLY"):
+        yield start
+        return
+    interval = max(1, int(rule.get("INTERVAL", "1") or 1))
+    count = int(rule["COUNT"]) if rule.get("COUNT", "").isdigit() else None
+    until = None
+    if rule.get("UNTIL"):
+        try:
+            until, until_is_date = parse_dt({}, rule["UNTIL"])
+            if not rule["UNTIL"].endswith("Z"):
+                until = until.replace(tzinfo=start.tzinfo)
+            if until_is_date:
+                until = until.replace(hour=23, minute=59, second=59)
+        except ValueError:
+            until = None
+    byday = parse_byday(rule.get("BYDAY", ""))
+    bymonth = set(int_list(rule.get("BYMONTH")))
+    wkst = WEEKDAYS.get(rule.get("WKST", "MO").upper(), 0)
+    tz = start.tzinfo
+    wall = start.replace(tzinfo=None)
+    start_date = wall.date()
+    tod = wall.time()
+
+    # Skip whole periods that end before the window when nothing is counted.
+    period = 0
+    if count is None:
+        gap_days = (window_start.astimezone(tz).replace(tzinfo=None).date() - start_date).days
+        if gap_days > 0:
+            if freq == "DAILY":
+                period = max(0, gap_days // interval - 1)
+            elif freq == "WEEKLY":
+                period = max(0, gap_days // (7 * interval) - 1)
+            elif freq == "MONTHLY":
+                period = max(0, (gap_days // 31) // interval - 1)
+            else:
+                period = max(0, (gap_days // 366) // interval - 1)
+
+    emitted = 0
+    loops = 0
+    week_anchor = start_date - dt.timedelta(days=(start_date.weekday() - wkst) % 7)
+    while loops < MAX_INSTANCES_PER_RULE:
+        loops += 1
+        if freq == "DAILY":
+            day = start_date + dt.timedelta(days=period * interval)
+            cands = [day]
+            if bymonth:
+                cands = [d for d in cands if d.month in bymonth]
+            if byday:
+                cands = [d for d in cands if d.weekday() in {w for _, w in byday}]
+            if rule.get("BYMONTHDAY"):
+                mds = int_list(rule.get("BYMONTHDAY"))
+                cands = [d for d in cands if d.day in mds or (d.day - calmod.monthrange(d.year, d.month)[1] - 1) in mds]
+            first_day = day
+        elif freq == "WEEKLY":
+            anchor = week_anchor + dt.timedelta(weeks=period * interval)
+            days = [w for _, w in byday] or [start_date.weekday()]
+            cands = sorted(anchor + dt.timedelta(days=(w - wkst) % 7) for w in set(days))
+            if bymonth:
+                cands = [d for d in cands if d.month in bymonth]
+            cands = apply_setpos(cands, rule)
+            first_day = anchor
+        elif freq == "MONTHLY":
+            y, m = add_months(start_date.year, start_date.month, period * interval)
+            cands = [] if bymonth and m not in bymonth else month_days(y, m, rule, start_date.day, byday)
+            cands = apply_setpos(cands, rule)
+            first_day = dt.date(y, m, 1)
+        else:  # YEARLY
+            y = start_date.year + period * interval
+            months = sorted(bymonth) or [start_date.month]
+            cands = []
+            if not bymonth and byday and any(o is not None for o, _ in byday) and not rule.get("BYMONTHDAY"):
+                # BYDAY ordinals count within the year.
+                for ordinal, weekday in byday:
+                    all_days = [dt.date(y, 1, 1) + dt.timedelta(days=i) for i in range(366 if calmod.isleap(y) else 365)]
+                    matches = [d for d in all_days if d.weekday() == weekday]
+                    if ordinal is None:
+                        cands.extend(matches)
+                    elif 0 < ordinal <= len(matches):
+                        cands.append(matches[ordinal - 1])
+                    elif ordinal < 0 and -ordinal <= len(matches):
+                        cands.append(matches[ordinal])
+                cands = sorted(set(cands))
+            else:
+                for m in months:
+                    cands.extend(month_days(y, m, rule, start_date.day, byday))
+            cands = apply_setpos(cands, rule)
+            first_day = dt.date(y, 1, 1)
+
+        for day in cands:
+            if day < start_date:
+                continue
+            occ = dt.datetime.combine(day, tod).replace(tzinfo=tz)
+            if until is not None and occ > until:
+                return
+            if count is not None and emitted >= count:
+                return
+            emitted += 1
+            if occ > window_end:
+                return
+            yield occ
+        if first_day > window_end.astimezone(tz).replace(tzinfo=None).date():
+            return
+        period += 1
+
+
+# --------------------------------------------------------------------------
+# Meeting links (MeetingBar's MeetingLinkDetector, condensed)
+
+SAFELINK_RE = re.compile(r"https://[^\s/?#\"'<>]+\.safelinks\.protection\.outlook\.com/[^\s\"'<>]*?[?&](?:amp;)?url=([^\s&\"'<>]+)[^\s\"'<>]*")
+GOOGLE_REDIRECT_RE = re.compile(r"https?://(?:www\.)?google\.[a-z.]{2,6}/url\?(?:[^\s\"'<>]*?&(?:amp;)?)?q=([^\s&\"'<>]+)[^\s\"'<>]*")
+CLARI_RE = re.compile(r"https?://go\.copilot\.clari\.com/hangout/([a-z]{3}-[a-z]{4}-[a-z]{3})/?(?=$|[?#\s\"'<>])")
+SOURCE_PRIORITY = {"conference": 60, "url": 50, "location": 40, "notes": 30, "htmlNotes": 20, "custom": 10}
+ALLOWED_SCHEMES = ("https://", "http://", "zoommtg://", "discord://")
+
+
+def load_services():
+    with open(os.path.join(HERE, "services.json"), encoding="utf-8") as fh:
+        doc = json.load(fh)
+    out = []
+    for s in doc["services"]:
+        try:
+            out.append((s["id"], s["name"], s.get("tier", 0), re.compile(s["pattern"])))
+        except re.error as exc:
+            print(f"kaigi: bad pattern for {s['id']}: {exc}", file=sys.stderr)
+    return out
+
+
+SERVICES = None
+
+
+def services():
+    global SERVICES
+    if SERVICES is None:
+        SERVICES = load_services()
+    return SERVICES
+
+
+def unwrap_redirects(text):
+    def unq(m):
+        return urllib.parse.unquote(m.group(1).replace("&amp;", "&"))
+    text = SAFELINK_RE.sub(unq, text)
+    text = GOOGLE_REDIRECT_RE.sub(unq, text)
+    text = CLARI_RE.sub(lambda m: "https://meet.google.com/" + m.group(1), text)
+    return text
+
+
+def strip_html(text):
+    text = re.sub(r"(?i)<br\s*/?>|</p>|</div>", "\n", text)
+    text = re.sub(r"(?i)<a\s[^>]*href=\"([^\"]+)\"[^>]*>", r" \1 ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return html.unescape(text)
+
+
+def find_link(fields, custom_patterns):
+    """fields: list of (source, text). Returns {url, service, serviceName} or None."""
+    best = None
+    for source, text in fields:
+        if not text or "://" not in text:
+            continue
+        text = unwrap_redirects(text)
+        for sid, name, tier, rx in services():
+            for m in rx.finditer(text):
+                url = re.split(r"[\"'<>]", m.group(0), maxsplit=1)[0].rstrip(".,;)")
+                key = (-SOURCE_PRIORITY[source], tier, m.start(), -len(url), url)
+                if best is None or key < best[0]:
+                    best = (key, {"url": url, "service": sid, "serviceName": name})
+                break
+        if best is not None and best[0][0] == -SOURCE_PRIORITY[source]:
+            break
+    if best is None:
+        for source, text in fields:
+            for rx in custom_patterns:
+                m = rx.search(text or "")
+                if m:
+                    return {"url": m.group(0), "service": "other", "serviceName": "Other"}
+        return None
+    link = best[1]
+    if not link["url"].startswith(ALLOWED_SCHEMES):
+        return None
+    return link
+
+
+def add_authuser(url, email):
+    if not email or "meet.google.com" not in url or "authuser=" in url:
+        return url
+    return url + ("&" if "?" in url else "?") + "authuser=" + urllib.parse.quote(email)
+
+
+# --------------------------------------------------------------------------
+# Feeds
+
+
+def feed_email(url):
+    """Google's secret iCal URL carries the calendar id (usually the owner's address)."""
+    m = re.search(r"calendar\.google\.com/calendar/ical/([^/]+)/", url or "")
+    if m:
+        cand = urllib.parse.unquote(m.group(1))
+        if "@" in cand and not cand.endswith("calendar.google.com"):
+            return cand
+    return None
+
+
+def cache_path(url):
+    return os.path.join(CACHE_DIR, hashlib.sha256(url.encode()).hexdigest()[:24] + ".ics")
+
+
+def fetch(url, max_age, force):
+    path = cache_path(url)
+    fresh = os.path.exists(path) and (time.time() - os.path.getmtime(path)) < max_age
+    if fresh and not force:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read(), None
+    if url.startswith("webcal://"):
+        url = "https://" + url[len("webcal://"):]
+    if not url.startswith("https://"):
+        return None, "only https:// feeds are allowed"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "omarchy-kaigi"})
+        with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as resp:
+            data = resp.read(MAX_FEED_BYTES + 1)
+        if len(data) > MAX_FEED_BYTES:
+            raise ValueError("feed is larger than 20 MB")
+        text = data.decode("utf-8", errors="replace")
+        if "BEGIN:VCALENDAR" not in text[:4096]:
+            raise ValueError("response is not an iCalendar feed")
+        os.makedirs(CACHE_DIR, mode=0o700, exist_ok=True)
+        tmp = path + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp, path)
+        return text, None
+    except Exception as exc:  # network, HTTP, decode: fall back to the cache
+        reason = type(exc).__name__
+        if hasattr(exc, "code"):
+            reason = f"HTTP {exc.code}"
+        elif isinstance(exc, ValueError):
+            reason = str(exc)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                return fh.read(), f"fetch failed ({reason}); showing cached copy"
+        return None, f"fetch failed ({reason})"
+
+
+# --------------------------------------------------------------------------
+# Events
+
+
+PARTSTAT = {"ACCEPTED": "accepted", "DECLINED": "declined", "TENTATIVE": "tentative", "NEEDS-ACTION": "pending", "DELEGATED": "declined"}
+
+
+def clip(text, limit):
+    text = (text or "").replace("\x00", "")
+    return text if len(text) <= limit else text[:limit]
+
+
+def event_base(props, emails, custom_patterns):
+    def text(name):
+        p, v = first(props, name)
+        return unescape_text(v) if v is not None else ""
+
+    title = " ".join(text("SUMMARY").split()) or ""
+    location = text("LOCATION")
+    description = text("DESCRIPTION")
+    url = text("URL")
+    conference = text("X-GOOGLE-CONFERENCE")
+    status = (text("STATUS") or "CONFIRMED").upper()
+    attendees = props.get("ATTENDEE", [])
+    participation = "accepted"
+    if attendees:
+        participation = "unknown"
+        for params, value in attendees:
+            addr = value.strip()
+            if addr.lower().startswith("mailto:"):
+                addr = addr[7:]
+            if addr.lower() in emails:
+                participation = PARTSTAT.get(params.get("PARTSTAT", "NEEDS-ACTION").upper(), "pending")
+                break
+        if participation == "unknown":
+            p, org = first(props, "ORGANIZER")
+            if org and org.lower().replace("mailto:", "") in emails:
+                participation = "accepted"
+    fields = [("conference", conference), ("url", url), ("location", location), ("notes", description)]
+    if "<" in description:
+        fields.append(("htmlNotes", strip_html(description)))
+    link = find_link(fields, custom_patterns)
+    if link and emails:
+        link["url"] = add_authuser(link["url"], sorted(emails)[0] if len(emails) == 1 else None)
+    return {
+        "title": clip(title, MAX_TITLE),
+        "location": clip(location, MAX_TEXT),
+        "status": "cancelled" if status == "CANCELLED" else ("tentative" if status == "TENTATIVE" else "confirmed"),
+        "participation": participation,
+        "hasAttendees": bool(attendees),
+        "link": link,
+    }
+
+
+def to_ms(d):
+    return int(d.timestamp() * 1000)
+
+
+def collect(text, cal_name, emails, custom_patterns, title_filters, window_start, window_end):
+    events = parse_components(text)
+    masters, overrides = [], {}
+    for props in events:
+        if "RECURRENCE-ID" in props:
+            p, v = first(props, "UID")
+            rp, rv = first(props, "RECURRENCE-ID")
+            try:
+                rid, _ = parse_dt(rp, rv)
+            except ValueError:
+                continue
+            overrides.setdefault(v or "", {})[to_ms(rid)] = props
+        else:
+            masters.append(props)
+
+    out = []
+
+    def emit(props, start, is_date, duration, uid, rid_ms=None):
+        end = start + duration
+        if end <= window_start or start >= window_end:
+            return
+        base = event_base(props, emails, custom_patterns)
+        if any(rx.search(base["title"]) for rx in title_filters):
+            return
+        p, lm = first(props, "LAST-MODIFIED")
+        ident = f"{uid}|{rid_ms if rid_ms is not None else to_ms(start)}"
+        base.update({
+            "id": hashlib.sha1(f"{cal_name}|{ident}".encode()).hexdigest()[:16],
+            "calendar": cal_name,
+            "start": to_ms(start),
+            "end": to_ms(end),
+            "allDay": is_date,
+            "lastModified": lm or "",
+        })
+        out.append(base)
+
+    def timing(props):
+        sp, sv = first(props, "DTSTART")
+        if sv is None:
+            return None
+        start, is_date = parse_dt(sp, sv)
+        ep, ev = first(props, "DTEND")
+        if ev is not None:
+            end, _ = parse_dt(ep, ev)
+            duration = end - start
+        else:
+            dp, dv = first(props, "DURATION")
+            duration = parse_duration(dv) if dv else None
+            if duration is None:
+                duration = dt.timedelta(days=1) if is_date else dt.timedelta(0)
+        if duration < dt.timedelta(0):
+            duration = dt.timedelta(0)
+        return start, is_date, duration
+
+    for props in masters:
+        try:
+            t = timing(props)
+        except ValueError:
+            continue
+        if not t:
+            continue
+        start, is_date, duration = t
+        p, uid = first(props, "UID")
+        uid = uid or hashlib.sha1(repr(sorted(props.keys())).encode()).hexdigest()
+        own_overrides = overrides.get(uid, {})
+        rp, rv = first(props, "RRULE")
+        if rv is None and "RDATE" not in props:
+            emit(props, start, is_date, duration, uid)
+            continue
+        exdates = set()
+        for xp, xv in props.get("EXDATE", []):
+            for d, d_is_date in parse_dt_list(xp, xv):
+                exdates.add(d.date() if d_is_date else to_ms(d))
+        starts = list(expand_rrule(start, is_date, parse_rrule(rv), window_start - duration, window_end)) if rv else [start]
+        for xp, xv in props.get("RDATE", []):
+            for d, _ in parse_dt_list(xp, xv):
+                if d.tzinfo is not None and start.tzinfo is not None and not xp.get("TZID") and not xv.strip().endswith("Z"):
+                    d = d.replace(tzinfo=start.tzinfo)
+                starts.append(d)
+        seen = set()
+        for occ in sorted(starts):
+            key = to_ms(occ)
+            if key in seen:
+                continue
+            seen.add(key)
+            if key in exdates or (is_date and occ.date() in exdates):
+                continue
+            if key in own_overrides:
+                continue  # emitted from the override below
+            emit(props, occ, is_date, duration, uid)
+        for rid_ms, oprops in own_overrides.items():
+            try:
+                ot = timing(oprops)
+            except ValueError:
+                continue
+            if ot:
+                emit(oprops, ot[0], ot[1], ot[2], uid, rid_ms)
+
+    # Overrides whose master is missing from the feed.
+    master_uids = {first(p, "UID")[1] for p in masters}
+    for uid, items in overrides.items():
+        if uid in master_uids:
+            continue
+        for rid_ms, oprops in items.items():
+            try:
+                ot = timing(oprops)
+            except ValueError:
+                continue
+            if ot:
+                emit(oprops, ot[0], ot[1], ot[2], uid, rid_ms)
+    return out
+
+
+def compile_list(patterns, label, errors):
+    out = []
+    for p in patterns or []:
+        try:
+            out.append(re.compile(str(p)))
+        except re.error:
+            errors.append({"calendar": "", "message": f"invalid {label}: {str(p)[:80]}"})
+    return out
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--config", default=DEFAULT_CONFIG)
+    ap.add_argument("--force", action="store_true", help="refetch feeds now")
+    ap.add_argument("--now", type=int, help="override now (epoch ms), for tests")
+    ap.add_argument("--days", type=int, default=2)
+    args = ap.parse_args(argv)
+
+    result = {"ok": True, "generatedAt": int(time.time() * 1000), "configured": False, "errors": [], "events": []}
+    try:
+        with open(os.path.expanduser(args.config), encoding="utf-8") as fh:
+            config = json.load(fh)
+    except FileNotFoundError:
+        print(json.dumps(result))
+        return 0
+    except (OSError, ValueError) as exc:
+        result["ok"] = False
+        result["errors"].append({"calendar": "", "message": f"config.json: {type(exc).__name__}"})
+        print(json.dumps(result))
+        return 0
+
+    calendars = [c for c in config.get("calendars", []) if isinstance(c, dict) and c.get("enabled", True)]
+    result["configured"] = bool(calendars)
+    max_age = max(60, int(config.get("refreshMinutes", 5)) * 60)
+    custom = compile_list(config.get("customRegexes"), "customRegexes", result["errors"])
+    filters = compile_list(config.get("filterEventRegexes"), "filterEventRegexes", result["errors"])
+    base_emails = {str(e).lower() for e in config.get("emails", []) if e}
+
+    now = dt.datetime.fromtimestamp((args.now or result["generatedAt"]) / 1000, tz=LOCAL)
+    window_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    window_end = window_start + dt.timedelta(days=max(1, args.days))
+
+    events = []
+    for i, cal in enumerate(calendars):
+        name = clip(str(cal.get("name") or f"Calendar {i + 1}"), 80)
+        emails = set(base_emails)
+        if cal.get("email"):
+            emails.add(str(cal["email"]).lower())
+        if cal.get("type") == "google":
+            account = str(cal.get("account") or "default")
+            snap, gerr = google.load(account, cal, window_start, window_end, max_age, args.force)
+            if gerr:
+                result["errors"].append({"calendar": name, "message": str(gerr)[:200], "code": gerr.code})
+            if snap:
+                email = google.read_json(google.ACCOUNTS_PATH, {}).get(account, {}).get("email", "")
+                helpers = {"find_link": find_link, "add_authuser": add_authuser, "strip_html": strip_html,
+                           "clip": clip, "to_ms": to_ms, "max_title": MAX_TITLE, "max_text": MAX_TEXT}
+                try:
+                    events.extend(e for e in google.convert(snap, email, name, helpers, custom, filters, LOCAL)
+                                  if e["end"] > to_ms(window_start) and e["start"] < to_ms(window_end))
+                except Exception as exc:
+                    result["errors"].append({"calendar": name, "message": f"parse failed ({type(exc).__name__})"})
+            continue
+        url = str(cal.get("url") or "")
+        if url and not emails and feed_email(url):
+            emails.add(feed_email(url).lower())
+        text, err = None, None
+        if cal.get("path"):
+            try:
+                with open(os.path.expanduser(str(cal["path"])), encoding="utf-8", errors="replace") as fh:
+                    text = fh.read(MAX_FEED_BYTES)
+            except OSError as exc:
+                err = f"cannot read file ({type(exc).__name__})"
+        elif url:
+            text, err = fetch(url, max_age, args.force)
+        else:
+            err = "calendar needs a url or a path"
+        if err:
+            result["errors"].append({"calendar": name, "message": err})
+        if text:
+            try:
+                for ev in collect(text, name, emails, custom, filters, window_start, window_end):
+                    ev["color"] = clip(str(cal.get("color", "")), 16)
+                    events.append(ev)
+            except Exception as exc:  # a malformed feed must not take down the others
+                result["errors"].append({"calendar": name, "message": f"parse failed ({type(exc).__name__})"})
+    events.sort(key=lambda e: (e["start"], e["calendar"], e["title"]))
+    result["events"] = events[:MAX_EVENTS]
+    result["ok"] = not result["errors"]
+    print(json.dumps(result, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

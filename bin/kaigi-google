@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""kaigi-google: sign in to Google Calendar for Kaigi.
+
+  kaigi-google setup [client_secret.json]   import your OAuth client (default: newest ~/Downloads/client_secret_*.json)
+  kaigi-google login [--account NAME]       open the browser and sign in (prints JSON lines)
+  kaigi-google logout [--account NAME]      revoke and forget the token
+  kaigi-google status                       JSON: client present, signed-in accounts
+  kaigi-google calendars [--account NAME]   list calendars (ids for config.json "calendarIds")
+"""
+
+import argparse
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import kaigi_google as google  # noqa: E402
+
+
+def emit(obj):
+    print(json.dumps(obj, ensure_ascii=False), flush=True)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Kaigi Google sign-in")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    s = sub.add_parser("setup")
+    s.add_argument("path", nargs="?")
+    for name in ("login", "logout", "calendars"):
+        p = sub.add_parser(name)
+        p.add_argument("--account", default="default")
+    sub.add_parser("status")
+    args = ap.parse_args(argv)
+    try:
+        if args.cmd == "setup":
+            src = google.setup_client(args.path)
+            emit({"event": "done", "message": f"imported {os.path.basename(src)}"})
+        elif args.cmd == "login":
+            google.login(args.account, progress=emit)
+        elif args.cmd == "logout":
+            google.logout(args.account)
+            emit({"event": "done"})
+        elif args.cmd == "status":
+            emit(google.status())
+        elif args.cmd == "calendars":
+            http, store = google.Http(), google.Secrets()
+            token = google.access_token(args.account, http, store)
+            doc = google.api_get(http, token, "/users/me/calendarList", {"maxResults": 250})
+            for c in doc.get("items", []):
+                emit({"id": c.get("id"), "summary": c.get("summaryOverride") or c.get("summary"),
+                      "selected": bool(c.get("selected")), "primary": bool(c.get("primary"))})
+    except google.GoogleError as exc:
+        emit({"event": "error", "code": exc.code, "message": str(exc)})
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

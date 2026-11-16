@@ -1,0 +1,23 @@
+omarchy-kaigi
+Copyright 2026 penguinwokrs
+
+This is an unofficial port and is not affiliated with or endorsed by the
+MeetingBar project. "MeetingBar" is the name of that project; no trademark
+rights are granted or claimed (Apache License 2.0, section 6).
+
+Portions are derived from MeetingBar (https://github.com/leits/MeetingBar,
+commit 93a0071b826c088f55ff177d20de1e9cc7ae3374),
+Copyright © 2020-2025 Andrii Leitsius and MeetingBar contributors,
+licensed under the Apache License, Version 2.0 (see LICENSE).
+The derived parts were modified (rewritten in Python/JavaScript/QML):
+
+  - bin/services.json: meeting-service URL patterns from
+    MeetingBar/Meetings/MeetingProvider.swift (copied, reformatted as JSON)
+  - Model.js: next-event selection, status-bar title and notification
+    planning logic from Calendar/EventSelection.swift,
+    UI/StatusBar/StatusBarPresentation.swift and
+    Notifications/NotificationPlanner.swift (translated to JavaScript)
+  - bin/kaigi-events: link-source ranking and redirect unwrapping from
+    MeetingBar/Meetings/MeetingLinkDetector.swift (translated to Python)
+  - i18n/ja.json, i18n/en.json: a few UI strings from MeetingBar's
+    Localizable.strings (ja translation by Mitsukuni Sato)

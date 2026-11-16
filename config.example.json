@@ -1,0 +1,28 @@
+{
+  "calendars": [],
+  "emails": [],
+
+  "showEventsForPeriod": "today",
+  "ongoingEventVisibility": "showTenMinBeforeNext",
+  "personalEventsAppereance": "show_active",
+  "allDayEvents": "show",
+  "nonAllDayEvents": "show",
+  "showPendingEvents": "show",
+  "showTentativeEvents": "show",
+  "declinedEventsAppereance": "strikethrough",
+  "pastEventsAppereance": "show_inactive",
+
+  "joinEventNotification": true,
+  "joinEventNotificationTime": 0,
+  "endOfEventNotification": true,
+  "endOfEventNotificationTime": 0,
+  "automaticEventJoin": false,
+  "automaticEventJoinTime": 0,
+  "actionGraceSeconds": 300,
+
+  "openMeetingsIn": "webapp",
+  "refreshMinutes": 5,
+  "customRegexes": [],
+  "filterEventRegexes": [],
+  "dismissedEvents": []
+}
