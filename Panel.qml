@@ -58,9 +58,11 @@ Panel {
   }
   readonly property bool hasErrors: service ? (service.errors.length > 0 || service.configError !== "") : false
 
+  // Japanese joins the units with nothing ("3時間57分"), and Translations.t()
+  // returns the key for an empty string unless it is given a fallback.
   readonly property var units: ({
     day: strings.t("unit.day"), hour: strings.t("unit.hour"),
-    minute: strings.t("unit.minute"), separator: strings.t("unit.separator")
+    minute: strings.t("unit.minute"), separator: strings.t("unit.separator", "")
   })
 
   function timeText(ms) {
