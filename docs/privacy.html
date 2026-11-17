@@ -1,61 +1,96 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kaigi Privacy Policy</title><style>
-body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1d1f21;background:#fafafa}
-h1{font-size:2em;margin-bottom:.2em}h2{margin-top:1.6em}code{background:#eee;padding:1px 4px;border-radius:3px}
-pre{background:#eee;padding:12px;overflow:auto}nav a{margin-right:1em}.lead{font-size:1.15em;color:#444}
-footer{margin-top:3em;font-size:.9em;color:#666}</style></head><body>
-<nav><a href="./">Kaigi</a><a href="privacy.html">Privacy Policy</a><a href="https://github.com/penguinwokrs/omarchy-kaigi">Source code</a></nav>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kaigi Privacy Policy</title>
+<meta name="description" content="Kaigi is an open-source plugin for the Omarchy desktop. It runs entirely on your own computer. It has no server, and the author operates no service that receives your data.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231d3fb8'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='9' width='18' height='16' rx='2'/%3E%3Cpath d='M7 14h18M12 6.5v4M20 6.5v4'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&amp;family=IBM+Plex+Serif:wght@600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="wrap">
+<div class="site-head">
+<a class="brand" href="./">Kaigi</a>
+<nav class="site-nav" aria-label="Site">
+<a href="privacy.html" aria-current="page">Privacy Policy</a>
+<a href="https://github.com/penguinwokrs/omarchy-kaigi">Source code</a>
+</nav>
+</div>
+</header>
+
+<main class="wrap">
+
+<div class="doc-head">
 <h1>Kaigi Privacy Policy</h1>
+<p class="lead">Kaigi is an open-source plugin for the Omarchy desktop. It runs entirely on your own computer. It has no server, and the author operates no service that receives your data.</p>
+</div>
 
-<p>Kaigi is an open-source plugin for the Omarchy desktop. It runs entirely on
-your own computer. It has no server, and the author operates no service that
-receives your data.</p>
-
+<section class="row">
 <h2>What Kaigi accesses</h2>
-
+<div class="row-body">
 <p>When you sign in with Google, Kaigi asks for two read-only permissions:</p>
-
-<ul>
-<li><strong>View events on all your calendars</strong> (<code>https://www.googleapis.com/auth/calendar.events.readonly</code>)
-<li><strong>See the list of Google calendars you&#x27;re subscribed to</strong> (<code>https://www.googleapis.com/auth/calendar.calendarlist.readonly</code>)
+<ul class="points">
+<li><strong>View events on all your calendars</strong> (<code>https://www.googleapis.com/auth/<wbr>calendar.events.readonly</code>)</li>
+<li><strong>See the list of Google calendars you're subscribed to</strong> (<code>https://www.googleapis.com/auth/<wbr>calendar.calendarlist.readonly</code>)</li>
 </ul>
-
 <p>It uses them to:</p>
-
-<ul>
-<li>list your calendars, so it knows which ones are shown (selected) in Google Calendar
-<li>read events from now through tomorrow: title, time, location, description, conference link, and your own RSVP status
+<ul class="points">
+<li>list your calendars, so it knows which ones are shown (selected) in Google Calendar</li>
+<li>read events from now through tomorrow: title, time, location, description, conference link, and your own RSVP status</li>
 </ul>
-
 <p>Kaigi never creates, changes, or deletes anything in your Google account.</p>
+</div>
+</section>
 
+<section class="row">
 <h2>Where your data goes</h2>
-
-<ul>
-<li><strong>Calendar data</strong> goes directly from Google&#x27;s API to your computer. Kaigi keeps a short-lived cache in <code>~/.cache/kaigi/</code>, readable only by your user, to show the next meeting in the bar.
-<li><strong>The sign-in token</strong> (OAuth refresh token) is stored in your desktop keyring (GNOME Keyring through the Secret Service API). Only if no keyring is available does it fall back to a file readable only by your user under <code>~/.local/state/kaigi/</code>.
-<li><strong>Nothing is sent anywhere else.</strong> Kaigi has no analytics, no telemetry, and no third-party services. The only network requests it makes go to Google&#x27;s OAuth and Calendar endpoints. Opening a meeting link hands that link to your own browser.
+<div class="row-body">
+<ul class="points">
+<li><strong>Calendar data</strong> goes directly from Google's API to your computer. Kaigi keeps a short-lived cache in <code>~/.cache/kaigi/</code>, readable only by your user, to show the next meeting in the bar.</li>
+<li><strong>The sign-in token</strong> (OAuth refresh token) is stored in your desktop keyring (GNOME Keyring through the Secret Service API). Only if no keyring is available does it fall back to a file readable only by your user under <code>~/.local/state/kaigi/</code>.</li>
+<li><strong>Nothing is sent anywhere else.</strong> Kaigi has no analytics, no telemetry, and no third-party services. The only network requests it makes go to Google's OAuth and Calendar endpoints. Opening a meeting link hands that link to your own browser.</li>
 </ul>
+</div>
+</section>
 
+<section class="row">
 <h2>Removing your data</h2>
-
-<ul>
-<li><strong>Sign out:</strong> the &quot;Sign out&quot; button in Kaigi, or <code>bin/kaigi-google logout</code>, revokes the token with Google, deletes it from the keyring, and removes the cache.
-<li><strong>Revoke access from Google&#x27;s side:</strong> you can also revoke Kaigi&#x27;s access at any time at <a href="https://myaccount.google.com/permissions">https://myaccount.google.com/permissions</a>.
-<li><strong>Uninstall:</strong> deleting <code>~/.config/kaigi</code>, <code>~/.local/state/kaigi</code>, and <code>~/.cache/kaigi</code> removes everything Kaigi stored.
+<div class="row-body">
+<ul class="points">
+<li><strong>Sign out:</strong> the "Sign out" button in Kaigi, or <code>bin/kaigi-google logout</code>, revokes the token with Google, deletes it from the keyring, and removes the cache.</li>
+<li><strong>Revoke access from Google's side:</strong> you can also revoke Kaigi's access at any time at <a href="https://myaccount.google.com/permissions">https://myaccount.google.com/permissions</a>.</li>
+<li><strong>Uninstall:</strong> deleting <code>~/.config/kaigi</code>, <code>~/.local/state/kaigi</code>, and <code>~/.cache/kaigi</code> removes everything Kaigi stored.</li>
 </ul>
+</div>
+</section>
 
+<section class="row">
 <h2>Use of Google user data</h2>
+<div class="row-body">
+<p>Kaigi's use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+</div>
+</section>
 
-<p>Kaigi&#x27;s use of information received from Google APIs adheres to the
-<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
-including the Limited Use requirements.</p>
-
+<section class="row">
 <h2>Contact</h2>
-
+<div class="row-body">
 <p>Open an issue at <a href="https://github.com/penguinwokrs/omarchy-kaigi/issues">https://github.com/penguinwokrs/omarchy-kaigi/issues</a>.</p>
+</div>
+</section>
 
-<footer>Kaigi is an unofficial, open-source port of MeetingBar for the Omarchy desktop. It is not affiliated with MeetingBar or Google.
-· <a href="privacy.html">Privacy Policy</a></footer>
-</body></html>
+</main>
+
+<footer class="wrap">
+<div class="site-foot">
+<p>Kaigi is an unofficial, open-source port of MeetingBar for the Omarchy desktop. It is not affiliated with MeetingBar or Google.</p>
+<a href="privacy.html">Privacy Policy</a>
+</div>
+</footer>
+
+</body>
+</html>

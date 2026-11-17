@@ -1,30 +1,149 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kaigi — your next meeting in the Omarchy bar</title><style>
-body{font:16px/1.6 system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1d1f21;background:#fafafa}
-h1{font-size:2em;margin-bottom:.2em}h2{margin-top:1.6em}code{background:#eee;padding:1px 4px;border-radius:3px}
-pre{background:#eee;padding:12px;overflow:auto}nav a{margin-right:1em}.lead{font-size:1.15em;color:#444}
-footer{margin-top:3em;font-size:.9em;color:#666}</style></head><body>
-<nav><a href="./">Kaigi</a><a href="privacy.html">Privacy Policy</a><a href="https://github.com/penguinwokrs/omarchy-kaigi">Source code</a></nav>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kaigi — your next meeting in the Omarchy bar</title>
+<meta name="description" content="Your next meeting and a countdown in the Omarchy bar. Join with one click, get notified when meetings start and end, and optionally have the meeting open by itself.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231d3fb8'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='9' width='18' height='16' rx='2'/%3E%3Cpath d='M7 14h18M12 6.5v4M20 6.5v4'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&amp;family=IBM+Plex+Serif:wght@600&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
 
+<header class="wrap">
+<div class="site-head">
+<a class="brand" href="./" aria-current="page">Kaigi</a>
+<nav class="site-nav" aria-label="Site">
+<a href="privacy.html">Privacy Policy</a>
+<a href="https://github.com/penguinwokrs/omarchy-kaigi">Source code</a>
+</nav>
+</div>
+</header>
+
+<main>
+
+<div class="wrap">
+<div class="hero">
+<div class="hero-text">
 <h1>Kaigi</h1>
 <p class="lead">Your next meeting and a countdown in the Omarchy bar. Join with one click, get notified when meetings start and end, and optionally have the meeting open by itself.</p>
+<p class="hero-actions"><a class="btn" href="#install">Install
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></a></p>
+</div>
+
+<figure class="demo">
+<div class="screen" role="img" aria-label="Illustration of the Omarchy bar. Next to the clock, Kaigi's widget reads “Weekly sync in 12m”. Kaigi's popup is open below it, with a “Join next event meeting: Weekly sync” button and four sample events for today: Design review, Weekly sync, Vendor call (declined) and Planning.">
+<div class="bar">
+<span class="bar-ws"><b>1</b><span>2</span><span>3</span><span>4</span></span>
+<span class="bar-mid"><span>Monday 12:19</span><span class="bar-widget">Weekly sync in 12m</span></span>
+<span class="bar-tray">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0"/><path d="M12 19.5h.01"/></svg>
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg>
+<svg width="17" height="15" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="19" height="10" rx="2"/><path d="M24 11v2M6 10.5v3M10 10.5v3"/></svg>
+</span>
+</div>
+<div class="popup">
+<div class="pp-join">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M15 10.5l6-3.5v10l-6-3.5"/></svg>
+<span>Join next event meeting: Weekly sync</span>
+</div>
+<div class="pp-head"><b>Today</b>Mon, Nov 16</div>
+<div class="pp-rows">
+<div class="pp-row is-past"><i style="background:#7aa2f7"></i><span class="pp-time">10:00 – 10:30</span><span class="pp-title">Design review</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M15 10.5l6-3.5v10l-6-3.5"/></svg></div>
+<div class="pp-row is-hot"><i style="background:#7aa2f7"></i><span class="pp-time">12:31 – 13:01</span><span class="pp-title">Weekly sync</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M15 10.5l6-3.5v10l-6-3.5"/></svg></div>
+<div class="pp-row is-declined"><i style="background:#9ece6a"></i><span class="pp-time">13:30 – 14:00</span><span class="pp-title">Vendor call</span><span></span></div>
+<div class="pp-row"><i style="background:#bb9af7"></i><span class="pp-time">15:00 – 15:45</span><span class="pp-title">Planning</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M15 10.5l6-3.5v10l-6-3.5"/></svg></div>
+</div>
+<div class="pp-sep"></div>
+<div class="pp-actions">
+<span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></svg>Refresh</span>
+<span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>Settings</span>
+</div>
+<div class="pp-updated">Updated 12:19</div>
+</div>
+</div>
+<figcaption>Illustration with sample events: the bar widget and its popup.</figcaption>
+</figure>
+</div>
+
+<dl class="facts">
+<div><dt>Runs on</dt><dd>Omarchy 4.5 or later</dd></div>
+<div><dt>Calendars</dt><dd>Google Calendar, iCalendar feeds</dd></div>
+<div><dt>Google access</dt><dd>Read-only</dd></div>
+<div><dt>Your data</dt><dd>Stays on your computer</dd></div>
+<div><dt>Based on</dt><dd>MeetingBar (unofficial port)</dd></div>
+<div><dt>License</dt><dd>Apache-2.0, open source</dd></div>
+</dl>
+</div>
+
+<div class="wrap rows">
+
+<section class="row">
 <h2>What it does</h2>
-<ul>
+<div class="row-body">
+<ul class="points">
 <li>Shows the next meeting and the time until it starts (or the time left) in the bar.</li>
 <li>Lists today's (and optionally tomorrow's) events; click one to open its Google Meet, Zoom, Teams or other meeting link.</li>
 <li>Sends a notification when a meeting starts and ends, and can open the meeting link automatically.</li>
 <li>Reads your calendars from Google Calendar (sign in with Google, read-only) or from iCalendar feeds.</li>
 </ul>
-<h2>How Kaigi uses your Google account</h2>
-<p>When you sign in with Google, Kaigi asks for read-only access to your calendar events and your calendar list. It uses them only to show your upcoming meetings on your own computer. Kaigi runs entirely on your machine; it has no server and sends your data nowhere except to Google's own API. It never creates, changes or deletes anything in your Google account. See the <a href="privacy.html">Privacy Policy</a> for details.</p>
-<h2>Install</h2>
-<p>Kaigi is a plugin for the <a href="https://omarchy.org/">Omarchy</a> Linux desktop (Omarchy 4.5 or later):</p>
-<pre><code>omarchy plugin add https://github.com/penguinwokrs/omarchy-kaigi --enable</code></pre>
-<p>Then open the Kaigi popup in the bar and press <em>Sign in with Google</em>.</p>
-<h2>Source and support</h2>
-<p>Kaigi is open source (Apache-2.0): <a href="https://github.com/penguinwokrs/omarchy-kaigi">github.com/penguinwokrs/omarchy-kaigi</a>. Report problems in its <a href="https://github.com/penguinwokrs/omarchy-kaigi/issues">issue tracker</a>.</p>
+</div>
+</section>
 
-<footer>Kaigi is an unofficial, open-source port of MeetingBar for the Omarchy desktop. It is not affiliated with MeetingBar or Google.
-· <a href="privacy.html">Privacy Policy</a></footer>
-</body></html>
+<section class="row">
+<h2>How Kaigi uses your Google account</h2>
+<div class="row-body">
+<p>When you sign in with Google, Kaigi asks for read-only access to your calendar events and your calendar list. It uses them only to show your upcoming meetings on your own computer. Kaigi runs entirely on your machine; it has no server and sends your data nowhere except to Google's own API. It never creates, changes or deletes anything in your Google account.</p>
+<table class="perms" aria-label="The Google permissions Kaigi asks for">
+<thead>
+<tr><th scope="col">Permission</th><th scope="col">Scope</th><th scope="col">Kaigi uses it to</th></tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row">View events on all your calendars</th>
+<td data-label="Scope"><code>calendar.events.readonly</code><span class="tag">Read-only</span></td>
+<td data-label="Kaigi uses it to">Read events from now through tomorrow: title, time, location, description, conference link, and your own RSVP status.</td>
+</tr>
+<tr>
+<th scope="row">See the list of Google calendars you're subscribed to</th>
+<td data-label="Scope"><code>calendar.calendarlist.readonly</code><span class="tag">Read-only</span></td>
+<td data-label="Kaigi uses it to">List your calendars, so it knows which ones are shown (selected) in Google Calendar.</td>
+</tr>
+</tbody>
+</table>
+<p>See the <a href="privacy.html">Privacy Policy</a> for details.</p>
+</div>
+</section>
+
+<section class="row" id="install">
+<h2>Install</h2>
+<div class="row-body">
+<p>Kaigi is a plugin for the <a href="https://omarchy.org/">Omarchy</a> Linux desktop (Omarchy 4.5 or later):</p>
+<pre class="cmd"><code>omarchy plugin add https://github.com/penguinwokrs/<wbr>omarchy-kaigi --enable</code></pre>
+<p>Then open the Kaigi popup in the bar and press <em>Sign in with Google</em>.</p>
+</div>
+</section>
+
+<section class="row">
+<h2>Source and support</h2>
+<div class="row-body">
+<p>Kaigi is open source (Apache-2.0): <a href="https://github.com/penguinwokrs/omarchy-kaigi">github.com/penguinwokrs/omarchy-kaigi</a>. Report problems in its <a href="https://github.com/penguinwokrs/omarchy-kaigi/issues">issue tracker</a>.</p>
+</div>
+</section>
+
+</div>
+
+</main>
+
+<footer class="wrap">
+<div class="site-foot">
+<p>Kaigi is an unofficial, open-source port of MeetingBar for the Omarchy desktop. It is not affiliated with MeetingBar or Google.</p>
+<a href="privacy.html">Privacy Policy</a>
+</div>
+</footer>
+
+</body>
+</html>
