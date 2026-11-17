@@ -21,3 +21,11 @@ The derived parts were modified (rewritten in Python/JavaScript/QML):
     MeetingBar/Meetings/MeetingLinkDetector.swift (translated to Python)
   - i18n/ja.json, i18n/en.json: a few UI strings from MeetingBar's
     Localizable.strings (ja translation by Mitsukuni Sato)
+
+The website under docs/ bundles two font families, each licensed under the
+SIL Open Font License, Version 1.1 (license texts in docs/fonts/):
+
+  - IBM Plex Sans and IBM Plex Serif, Copyright © 2017 IBM Corp. with
+    Reserved Font Name "Plex"
+  - JetBrains Mono, Copyright 2020 The JetBrains Mono Project Authors
+    (https://github.com/JetBrains/JetBrainsMono)
