@@ -13,6 +13,7 @@ network.
 """
 
 import base64
+import contextlib
 import datetime as dt
 import hashlib
 import html
@@ -21,6 +22,7 @@ import json
 import os
 import secrets
 import shutil
+import signal
 import subprocess
 import time
 import urllib.error
@@ -272,6 +274,27 @@ def _callback_server():
     return server, result
 
 
+@contextlib.contextmanager
+def finishing_despite_sigterm():
+    """Once the browser has come back, finish the sign-in even if asked to stop.
+
+    The shell stops a sign-in that is still waiting for the browser when the
+    user starts something else. Stopping between storing the token and listing
+    the account would leave a token that nothing shows and nothing signs out.
+    """
+    unset = object()
+    previous = unset
+    try:
+        previous = signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    except ValueError:  # not the main thread; nothing to guard
+        pass
+    try:
+        yield
+    finally:
+        if previous is not unset and previous is not None:
+            signal.signal(signal.SIGTERM, previous)
+
+
 def default_opener(url):
     subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
@@ -306,26 +329,27 @@ def login(account="default", http_client=None, opener=default_opener, secrets_st
         raise GoogleError(f"sign-in was not completed ({result['error'][:60]})")
     if not secrets.compare_digest(result.get("state", ""), state):
         raise GoogleError("state mismatch; sign-in aborted")
-    status, tok = http_client.request("POST", TOKEN_URL, {
-        "client_id": client["client_id"], "client_secret": client["client_secret"],
-        "code": result["code"], "code_verifier": verifier,
-        "grant_type": "authorization_code", "redirect_uri": redirect,
-    })
-    if status != 200 or not tok.get("refresh_token"):
-        raise GoogleError(f"token exchange failed ({tok.get('error', status)})")
-    status, primary = http_client.request("GET", f"{API}/users/me/calendarList/primary",
-                                          headers={"Authorization": f"Bearer {tok['access_token']}"})
-    email = str(primary.get("id") or "") if status == 200 else ""
-    accounts = read_json(accounts_path, {})
-    if account == "auto":
-        # "Add account": key the account by its address, reusing the key of
-        # an account already signed in with the same address.
-        same = [k for k, v in accounts.items() if email and str(v.get("email", "")).lower() == email.lower()]
-        account = same[0] if same else (email.lower() if email else "default")
-    where = secrets_store.store(account, tok["refresh_token"])
-    accounts[account] = {"email": email, "addedAt": int(time.time()), "storage": where}
-    write_private(accounts_path, json.dumps(accounts, indent=2) + "\n")
-    ensure_config_entry(account, config_path, email)
+    with finishing_despite_sigterm():
+        status, tok = http_client.request("POST", TOKEN_URL, {
+            "client_id": client["client_id"], "client_secret": client["client_secret"],
+            "code": result["code"], "code_verifier": verifier,
+            "grant_type": "authorization_code", "redirect_uri": redirect,
+        })
+        if status != 200 or not tok.get("refresh_token"):
+            raise GoogleError(f"token exchange failed ({tok.get('error', status)})")
+        status, primary = http_client.request("GET", f"{API}/users/me/calendarList/primary",
+                                              headers={"Authorization": f"Bearer {tok['access_token']}"})
+        email = str(primary.get("id") or "") if status == 200 else ""
+        accounts = read_json(accounts_path, {})
+        if account == "auto":
+            # "Add account": key the account by its address, reusing the key of
+            # an account already signed in with the same address.
+            same = [k for k, v in accounts.items() if email and str(v.get("email", "")).lower() == email.lower()]
+            account = same[0] if same else (email.lower() if email else "default")
+        where = secrets_store.store(account, tok["refresh_token"])
+        accounts[account] = {"email": email, "addedAt": int(time.time()), "storage": where}
+        write_private(accounts_path, json.dumps(accounts, indent=2) + "\n")
+        ensure_config_entry(account, config_path, email)
     progress({"event": "done", "account": account, "email": email, "storage": where})
     return email
 

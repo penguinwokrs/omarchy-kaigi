@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import sys
 import tempfile
 import threading
@@ -129,6 +130,33 @@ class LoginTests(unittest.TestCase):
         opener, _ = self.browser()
         self.login(fake, secrets, opener)
         self.assertEqual(len(g.read_json(self.config, {})["calendars"]), 2)
+
+    def test_a_stop_request_after_the_browser_came_back_does_not_strand_the_token(self):
+        # The shell sends SIGTERM to replace a sign-in that is waiting for the
+        # browser. Arriving after the callback, it must not end the sign-in
+        # between storing the token and listing the account.
+        stopped = []
+        previous = signal.signal(signal.SIGTERM, lambda *_: stopped.append(True))
+        self.addCleanup(signal.signal, signal.SIGTERM, previous)
+        ours = signal.getsignal(signal.SIGTERM)
+
+        class StoppedWhileStoring(FakeSecrets):
+            def store(self, account, token):
+                where = super().store(account, token)
+                os.kill(os.getpid(), signal.SIGTERM)
+                return where
+
+        fake, secrets = FakeGoogle(), StoppedWhileStoring()
+        opener, _ = self.browser()
+        self.assertEqual(self.login(fake, secrets, opener), "me@example.com")
+        self.assertEqual(stopped, [])
+        self.assertEqual(secrets.data["default"], "rt1")
+        self.assertEqual(g.read_json(self.accounts, {})["default"]["email"], "me@example.com")
+        self.assertEqual([c.get("type") for c in g.read_json(self.config, {})["calendars"]], [None, "google"])
+        # Before the browser comes back, and after the sign-in, stopping works as usual.
+        self.assertIs(signal.getsignal(signal.SIGTERM), ours)
+        os.kill(os.getpid(), signal.SIGTERM)
+        self.assertEqual(stopped, [True])
 
     def test_add_account_auto_keys_by_email_and_finds_chrome_profile(self):
         chrome = os.path.join(self.tmp.name, "cfg", "google-chrome")

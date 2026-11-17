@@ -446,8 +446,43 @@ function plainNotificationText(text) {
   return String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 }
 
+// ---- Google helper requests -------------------------------------------------
+//
+// Service.qml runs one bin/kaigi-google command at a time; these keep the
+// requests made meanwhile. A request is the helper's argument list.
+
+function isGoogleLogin(args) { return !!args && args[0] === "login" }
+
+// Add a request. The same request twice (a double click) waits once, and a
+// newer sign-in replaces one that has not started.
+function googleEnqueue(queue, args) {
+  var key = JSON.stringify(args)
+  var out = []
+  for (var i = 0; i < (queue || []).length; i++) {
+    if (JSON.stringify(queue[i]) === key) return queue
+    if (isGoogleLogin(args) && isGoogleLogin(queue[i])) continue
+    out.push(queue[i])
+  }
+  out.push(args)
+  return out
+}
+
+// Take the next request: { args, rest }, or null when nothing waits. A sign-in
+// goes last: it waits for the browser, and a request left behind it would
+// have to end it again.
+function googleDequeue(queue) {
+  if (!queue || !queue.length) return null
+  var at = 0
+  for (var i = 0; i < queue.length; i++) {
+    if (!isGoogleLogin(queue[i])) { at = i; break }
+  }
+  return { args: queue[at], rest: queue.slice(0, at).concat(queue.slice(at + 1)) }
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    googleEnqueue: googleEnqueue,
+    googleDequeue: googleDequeue,
     DEFAULT_CONFIG: DEFAULT_CONFIG,
     withDefaults: withDefaults,
     nextEvent: nextEvent,

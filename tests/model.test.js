@@ -182,3 +182,32 @@ test("a missing app falls back to the browser and names the app", () => {
   assert.equal(M.openPlan({ url: "javascript:alert(1)", service: "meet" }, {}, null), null)
   assert.equal(plan("discord", "discord://discord.com/channels/1/2").via, "app")
 })
+
+const LOGIN = ["login", "--account", "auto"]
+const OUT_A = ["logout", "--account", "a@example.com"]
+const OUT_B = ["logout", "--account", "b@example.com"]
+
+test("a request made while the Google helper runs waits instead of being dropped", () => {
+  let q = M.googleEnqueue([], OUT_A)
+  q = M.googleEnqueue(q, OUT_B)
+  assert.deepEqual(q, [OUT_A, OUT_B])
+  // A double click waits once.
+  assert.deepEqual(M.googleEnqueue(q, ["logout", "--account", "a@example.com"]), [OUT_A, OUT_B])
+  // A newer sign-in replaces one that has not started.
+  q = M.googleEnqueue(M.googleEnqueue(q, ["login", "--account", "default"]), LOGIN)
+  assert.deepEqual(q, [OUT_A, OUT_B, LOGIN])
+  assert.deepEqual(M.googleEnqueue(null, ["setup"]), [["setup"]])
+})
+
+test("queued Google requests run in order, with a sign-in last", () => {
+  let q = [LOGIN, OUT_A, OUT_B]
+  const ran = []
+  for (let next = M.googleDequeue(q); next; next = M.googleDequeue(q)) {
+    ran.push(next.args)
+    q = next.rest
+  }
+  assert.deepEqual(ran, [OUT_A, OUT_B, LOGIN])
+  assert.equal(M.googleDequeue([]), null)
+  assert.equal(M.googleDequeue(null), null)
+  assert.deepEqual(M.googleDequeue([LOGIN]), { args: LOGIN, rest: [] })
+})

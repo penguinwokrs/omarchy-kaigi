@@ -154,17 +154,18 @@ Item {
 
   // ---- Google -----------------------------------------------------------
 
-  // A sign-in waits up to five minutes for the browser to come back. If the
-  // user gave up on that tab, the next request replaces the wait instead of
-  // being ignored until it times out.
-  property var googlePending: null
+  // One helper command runs at a time. A request made meanwhile waits its
+  // turn (Model.googleEnqueue) instead of being dropped. A sign-in waits up
+  // to five minutes for the browser to come back, so a request made during
+  // that wait ends it: the user gave up on that tab. Once the browser has
+  // come back the helper ignores the signal and finishes first.
+  property var googleQueue: []
   property bool googleWaitingForBrowser: false
 
   function googleRun(args) {
     if (googleProc.running) {
-      if (!root.googleWaitingForBrowser) return
-      root.googlePending = args
-      googleProc.signal(15)
+      root.googleQueue = Model.googleEnqueue(root.googleQueue, args)
+      if (root.googleWaitingForBrowser) googleProc.signal(15)
       return
     }
     root.googleWaitingForBrowser = args[0] === "login"
@@ -342,14 +343,14 @@ Item {
     stdout: SplitParser { onRead: function(line) { root.googleLine(line) } }
     onExited: function(exitCode) {
       root.googleWaitingForBrowser = false
-      if (root.googlePending) {
-        var next = root.googlePending
-        root.googlePending = null
-        root.googleRun(next)
-        return
-      }
-      if (exitCode === 0) { root.googleState = ""; root.googleMessage = "" }
+      var next = Model.googleDequeue(root.googleQueue)
+      if (next) {
+        root.googleQueue = next.rest
+        root.googleRun(next.args)
+      } else if (exitCode === 0) { root.googleState = ""; root.googleMessage = "" }
       else if (root.googleState === "running") root.googleState = "error"
+      // Also between queued commands, so a sign-out shows before a sign-in
+      // queued behind it starts waiting for the browser.
       root.googleRefreshStatus()
       root.refresh(true)
     }
