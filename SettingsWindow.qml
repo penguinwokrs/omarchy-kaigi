@@ -30,6 +30,13 @@ Item {
 
   function open(page) {
     if (page) root.tab = page
+    // The overlay maps on the monitor that had focus when it opened. If it is
+    // still open somewhere else, map it again here instead of doing nothing.
+    if (root.opened) {
+      root.opened = false
+      Qt.callLater(function() { root.open(page) })
+      return
+    }
     root.opened = true
     if (service) service.refresh(true)
     Qt.callLater(function() { if (root.opened) keys.forceActiveFocus() })
@@ -465,7 +472,7 @@ Item {
               text: strings.t("google.signOut")
               foreground: root.fg
               fontFamily: root.fontFamily
-              enabled: root.service ? root.service.googleState !== "running" : false
+              enabled: !!root.service
               onClicked: root.service.googleLogout(acct.modelData.account)
             }
           }
@@ -511,8 +518,10 @@ Item {
         text: strings.t("google.addAccount")
         foreground: root.fg
         fontFamily: root.fontFamily
-        enabled: root.service ? root.service.googleState !== "running" : false
-        onClicked: root.service.googleLogin("auto")
+        enabled: !!root.service
+        // The overlay holds the keyboard and covers the screen, so make way
+        // for the browser tab that sign-in opens.
+        onClicked: { root.service.googleLogin("auto"); root.close() }
       }
       Note {
         visible: !!root.service && root.service.googleState !== ""

@@ -263,7 +263,7 @@ Panel {
             Button {
               width: parent.width
               visible: !!root.service && root.service.googleClient && root.service.googleAccounts.length === 0
-              enabled: root.service ? root.service.googleState !== "running" : false
+              enabled: !!root.service
               iconText: "󰊭"
               text: strings.t("google.signIn")
               foreground: root.foreground
@@ -275,7 +275,7 @@ Panel {
               Button {
                 required property var modelData
                 width: column.width
-                enabled: root.service ? root.service.googleState !== "running" : false
+                enabled: !!root.service
                 iconText: "󰊭"
                 text: strings.t("google.signInAgainFor").arg(root.accountEmail(modelData))
                 foreground: root.foreground
@@ -448,7 +448,7 @@ Panel {
                   id: signOutButton
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
-                  enabled: root.service ? root.service.googleState !== "running" : false
+                  enabled: !!root.service
                   iconText: "󰍃" // nf-md-logout
                   text: strings.t("google.signOut")
                   foreground: root.foreground
@@ -458,7 +458,7 @@ Panel {
               }
             }
             Button {
-              enabled: root.service ? root.service.googleState !== "running" : false
+              enabled: !!root.service
               iconText: "󰐕" // nf-md-plus
               text: strings.t("google.addAccount")
               foreground: root.foreground

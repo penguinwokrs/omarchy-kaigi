@@ -154,8 +154,20 @@ Item {
 
   // ---- Google -----------------------------------------------------------
 
+  // A sign-in waits up to five minutes for the browser to come back. If the
+  // user gave up on that tab, the next request replaces the wait instead of
+  // being ignored until it times out.
+  property var googlePending: null
+  property bool googleWaitingForBrowser: false
+
   function googleRun(args) {
-    if (googleProc.running) return
+    if (googleProc.running) {
+      if (!root.googleWaitingForBrowser) return
+      root.googlePending = args
+      googleProc.signal(15)
+      return
+    }
+    root.googleWaitingForBrowser = args[0] === "login"
     root.googleState = "running"
     root.googleMessage = ""
     googleProc.command = ["python3", "-I", googlePath].concat(args)
@@ -329,6 +341,13 @@ Item {
     id: googleProc
     stdout: SplitParser { onRead: function(line) { root.googleLine(line) } }
     onExited: function(exitCode) {
+      root.googleWaitingForBrowser = false
+      if (root.googlePending) {
+        var next = root.googlePending
+        root.googlePending = null
+        root.googleRun(next)
+        return
+      }
       if (exitCode === 0) { root.googleState = ""; root.googleMessage = "" }
       else if (root.googleState === "running") root.googleState = "error"
       root.googleRefreshStatus()
