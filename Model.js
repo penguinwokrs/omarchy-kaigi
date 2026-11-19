@@ -186,6 +186,7 @@ function menuAppearance(event, config, now) {
     past: past,
     ongoing: isOngoing(event, now),
     declined: event.participation === "declined",
+    pending: event.participation === "pending",
     joinable: hasLink(event)
   }
 }
@@ -239,6 +240,40 @@ function passesEventFilter(event, config) {
   return true
 }
 
+// Rows for the "auto-join unanswered invitations" switches: one per Google
+// calendar shown (accounts from kaigi-events) and one per iCal feed.
+// calendarId is "" for a feed. Unset means on.
+function pendingAutoJoinRows(accounts, feeds) {
+  var rows = []
+  accounts = accounts || []
+  for (var a = 0; a < accounts.length; a++) {
+    var acct = accounts[a] || {}
+    var chosen = acct.calendarIds && acct.calendarIds.length ? acct.calendarIds : (acct.activeIds || [])
+    var map = acct.pendingAutoJoin && typeof acct.pendingAutoJoin === "object" ? acct.pendingAutoJoin : {}
+    var cals = acct.calendars || []
+    for (var c = 0; c < cals.length; c++) {
+      var cal = cals[c] || {}
+      var id = String(cal.id || "")
+      if (!id || (chosen.indexOf(id) === -1 && !(cal.primary && chosen.indexOf("primary") !== -1))) continue
+      rows.push({
+        key: String(acct.account || "") + ":" + id,
+        index: acct.configIndex,
+        calendarId: id,
+        name: String(cal.summary || id),
+        owner: accounts.length > 1 ? String(acct.email || acct.account || "") : "",
+        on: map[id] !== false
+      })
+    }
+  }
+  feeds = feeds || []
+  for (var f = 0; f < feeds.length; f++) {
+    var feed = feeds[f] || {}
+    rows.push({ key: "feed:" + feed.configIndex, index: feed.configIndex, calendarId: "",
+                name: String(feed.name || ""), owner: "", on: feed.pendingAutoJoin !== false })
+  }
+  return rows
+}
+
 function actionIdentity(event, kind, offsetSeconds) {
   var anchor = kind === "eventEnd" ? event.end : event.start
   return event.id + "|" + Math.floor(anchor / 1000) + "|" + kind + "|" + offsetSeconds
@@ -265,6 +300,9 @@ function dueActions(events, config, now, fired) {
       var plan = plans[p]
       if (!plan.enabled) continue
       if (plan.needsLink && !hasLink(e)) continue
+      // A calendar can opt out of auto-joining invitations not answered yet
+      // (kaigi-events sets autoJoinPending from its pendingAutoJoin setting).
+      if (plan.kind === "autoJoin" && e.participation === "pending" && e.autoJoinPending === false) continue
       var anchor = plan.anchor === "end" ? e.end : e.start
       var fireAt = anchor - plan.offset * 1000
       // Past the anchor (start or end) a start-type action is stale.
@@ -494,6 +532,7 @@ if (typeof module !== "undefined") {
     menuSections: menuSections,
     dueActions: dueActions,
     passesEventFilter: passesEventFilter,
+    pendingAutoJoinRows: pendingAutoJoinRows,
     actionIdentity: actionIdentity,
     pruneFired: pruneFired,
     launchableUrl: launchableUrl,

@@ -603,6 +603,7 @@ def convert(snapshot, account_email, cal_name, helpers, custom, filters, local):
             out.append({
                 "id": hashlib.sha1(f"google|{ident}".encode()).hexdigest()[:16],
                 "calendar": clip(cal_name if len(snapshot.get("calendars", [])) == 1 else cal["summary"], 80),
+                "calendarId": clip(str(cal["id"]), 200),
                 "title": clip(title, helpers["max_title"]),
                 "location": clip(location, helpers["max_text"]),
                 "status": "cancelled" if status == "cancelled" else ("tentative" if status == "tentative" else "confirmed"),

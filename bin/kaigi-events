@@ -622,6 +622,26 @@ def clip(text, limit):
     return text if len(text) <= limit else text[:limit]
 
 
+# Whether invitations you have not answered yet are auto-joined. A calendar
+# entry's "pendingAutoJoin" turns it off: false for an iCal feed, or
+# {"<calendar id>": false} for the calendars of a Google account.
+PENDING_AUTO_JOIN_DEFAULT = True
+
+
+def pending_auto_join(cal, calendar_id=None):
+    value = cal.get("pendingAutoJoin")
+    if isinstance(value, dict):
+        value = value.get(calendar_id) if calendar_id is not None else None
+    return value if isinstance(value, bool) else PENDING_AUTO_JOIN_DEFAULT
+
+
+def pending_auto_join_map(cal):
+    value = cal.get("pendingAutoJoin")
+    if not isinstance(value, dict):
+        return {}
+    return {str(k)[:200]: v for k, v in list(value.items())[:100] if isinstance(v, bool)}
+
+
 def event_base(props, emails, custom_patterns):
     def text(name):
         p, v = first(props, name)
@@ -850,6 +870,7 @@ def main(argv=None):
                 "configIndex": config_index, "account": account, "email": email,
                 "calendarIds": [str(x) for x in (cal.get("calendarIds") or [])][:100],
                 "chromeProfile": str(cal.get("chromeProfile") or ""),
+                "pendingAutoJoin": pending_auto_join_map(cal),
                 "calendars": (snap or {}).get("allCalendars") or (snap or {}).get("calendars") or [],
                 "activeIds": [c["id"] for c in (snap or {}).get("calendars", [])],
             })
@@ -863,9 +884,11 @@ def main(argv=None):
                     result["errors"].append({"calendar": name, "message": f"parse failed ({type(exc).__name__})"})
             for ev in events[start_count:]:
                 ev["browserProfile"] = profile
+                ev["autoJoinPending"] = pending_auto_join(cal, ev.get("calendarId", ""))
             continue
         result["feeds"].append({"configIndex": config_index, "name": name,
-                                "kind": "file" if cal.get("path") else "url"})
+                                "kind": "file" if cal.get("path") else "url",
+                                "pendingAutoJoin": pending_auto_join(cal)})
         url = str(cal.get("url") or "")
         if url and not emails and feed_email(url):
             emails.add(feed_email(url).lower())
@@ -887,6 +910,7 @@ def main(argv=None):
                 for ev in collect(text, name, emails, custom, filters, window_start, window_end):
                     ev["color"] = clip(str(cal.get("color", "")), 16)
                     ev["browserProfile"] = profile
+                    ev["autoJoinPending"] = pending_auto_join(cal)
                     events.append(ev)
             except Exception as exc:  # a malformed feed must not take down the others
                 result["errors"].append({"calendar": name, "message": f"parse failed ({type(exc).__name__})"})

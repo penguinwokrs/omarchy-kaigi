@@ -105,6 +105,7 @@ Item {
     { value: "300", label: strings.t("settings.minBefore").arg(5) },
     { value: "600", label: strings.t("settings.minBefore").arg(10) }
   ]
+  readonly property var pendingAutoJoinRows: service ? Model.pendingAutoJoinRows(service.calendarAccounts, service.feeds) : []
   readonly property var profileOptions: {
     var out = [{ value: "", label: strings.t("settings.profileLastUsed") }]
     var list = service ? service.chromeProfiles : []
@@ -393,6 +394,38 @@ Item {
       Heading { text: strings.t("settings.autoJoin") }
       SwitchRow { key: "automaticEventJoin"; label: strings.t("settings.autoJoin.label"); description: strings.t("settings.autoJoin.desc") }
       ChoiceRow { key: "automaticEventJoinTime"; numeric: true; label: strings.t("settings.when.join"); options: root.timingStart; enabled: root.on("automaticEventJoin", false) }
+
+      // Per calendar: also auto-join invitations not answered yet.
+      Text {
+        readonly property bool active: root.on("automaticEventJoin", false) && root.str("showPendingEvents") !== "hide"
+        visible: root.pendingAutoJoinRows.length > 0
+        width: root.rowWidth
+        topPadding: Style.space(4)
+        textFormat: Text.PlainText
+        wrapMode: Text.Wrap
+        text: strings.t("settings.pendingAutoJoin")
+        color: root.fg
+        opacity: active ? 1 : 0.4
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+      }
+      Repeater {
+        model: root.pendingAutoJoinRows
+        CompactSwitch {
+          required property var modelData
+          objectName: "pendingAutoJoin:" + modelData.key
+          label: modelData.name
+          description: modelData.owner
+          checked: modelData.on
+          enabled: !!root.service && root.on("automaticEventJoin", false) && root.str("showPendingEvents") !== "hide"
+          opacity: enabled ? 1 : 0.4
+          onClicked: if (enabled) root.service.setPendingAutoJoin(modelData.index, modelData.calendarId, !modelData.on)
+        }
+      }
+      Note {
+        visible: root.pendingAutoJoinRows.length > 0
+        text: root.str("showPendingEvents") === "hide" ? strings.t("settings.pendingAutoJoin.hidden") : strings.t("settings.pendingAutoJoin.note")
+      }
 
       Heading { text: strings.t("settings.notifications") }
       SwitchRow { key: "joinEventNotification"; fallback: true; label: strings.t("settings.notifyStart") }

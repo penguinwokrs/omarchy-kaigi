@@ -139,6 +139,27 @@ Item {
   function setCalendarIds(index, ids) { updateCalendar(index, "calendarIds", ids.slice(0, 100)) }
   function setCalendarProfile(index, dir) { updateCalendar(index, "chromeProfile", String(dir || "")) }
 
+  // Auto-join for invitations not answered yet. calendarId is a Google
+  // calendar's id within the account; pass "" for an iCal feed. Merges into
+  // the stored entry so two quick toggles both stick.
+  function setPendingAutoJoin(index, calendarId, on) {
+    var next = cloneConfig()
+    if (!Array.isArray(next.calendars) || !next.calendars[index]) return
+    var entry = next.calendars[index]
+    if (!calendarId) {
+      if (on) delete entry.pendingAutoJoin
+      else entry.pendingAutoJoin = false
+    } else {
+      var map = entry.pendingAutoJoin && typeof entry.pendingAutoJoin === "object" && !Array.isArray(entry.pendingAutoJoin)
+        ? entry.pendingAutoJoin : ({})
+      if (on) delete map[calendarId]
+      else map[calendarId] = false
+      if (Object.keys(map).length) entry.pendingAutoJoin = map
+      else delete entry.pendingAutoJoin
+    }
+    writeConfig(next)
+  }
+
   function openConfigFile() {
     Util.execArgv(["bash", "-c", 'f="$1"; mkdir -p "$(dirname "$f")"; [ -e "$f" ] || cp "$2" "$f"; chmod 600 "$f"; exec omarchy-launch-editor "$f"',
                    "kaigi", root.configPath,

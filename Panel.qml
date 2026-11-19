@@ -377,13 +377,34 @@ Panel {
                         : root.timeText(row.event.start) + (root.showEventEndTime ? " – " + root.timeText(row.event.end) : "")
                     }
 
-                    PlainText {
-                      id: titleText
+                    // Title, then "Not answered" for invitations without a
+                    // reply. The box keeps the join glyph at the right edge.
+                    Item {
+                      id: titleBox
                       width: rowContent.width - timeLabel.width - joinGlyph.width - Style.space(3) - rowContent.spacing * 3
+                      height: titleText.implicitHeight
                       anchors.verticalCenter: parent.verticalCenter
-                      font.strikeout: row.look.declined
-                      font.bold: row.look.ongoing
-                      text: Model.shortenTitle(row.event.title, root.menuTitleLength, strings.t("noTitle"))
+
+                      PlainText {
+                        id: titleText
+                        width: Math.min(implicitWidth, titleBox.width - (pendingMark.visible ? pendingMark.implicitWidth + Style.space(8) : 0))
+                        anchors.verticalCenter: parent.verticalCenter
+                        font.strikeout: row.look.declined
+                        font.bold: row.look.ongoing
+                        text: Model.shortenTitle(row.event.title, root.menuTitleLength, strings.t("noTitle"))
+                      }
+
+                      PlainText {
+                        id: pendingMark
+                        visible: !!row.look.pending
+                        anchors.left: titleText.right
+                        anchors.leftMargin: Style.space(8)
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideNone
+                        color: root.dim
+                        font.pixelSize: Style.font.bodySmall
+                        text: strings.t("pendingMark")
+                      }
                     }
 
                     PlainText {

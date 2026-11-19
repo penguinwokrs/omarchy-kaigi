@@ -17,6 +17,7 @@
 │ ▍ 10:00 – 10:30  過去の打ち合わせ       │  （終わった予定は薄く表示）
 │ ▍ 12:31 – 13:01  Kaigi テスト定例   󰕧 │
 │ ▍ 13:30 – 14:00  ~~辞退した会議~~      │  （辞退した予定は取り消し線）
+│ ▍ 15:00 – 15:30  採用面接  未返答   󰕧 │  （未返答の招待には目印）
 │ 󰑐 更新   󰒓 設定                       │
 └──────────────────────────────────────┘
 ```
@@ -100,12 +101,25 @@ Google の項目と並べて、あるいは代わりに、`.ics` のURLやファ
 
 取得するのは `https://` と `webcal://` のURLだけです。この場合、どの参加者が自分かは `emails` で指定します。
 
+### 未返答の招待の自動参加
+
+自動参加は、まだ返答していない招待も開きます。一部のカレンダーだけ開かないようにするには、設定画面の「一般 → 未返答の招待も自動で開くカレンダー」でそのカレンダーをオフにします。
+Google のカレンダー1つずつと iCal フィード1本ずつにスイッチがあり、設定していないカレンダーはオンのままです。
+オフにしても止まるのは自動参加だけで、開始と終了の通知は届きます。
+
+`config.json` では、カレンダーの項目の `pendingAutoJoin` です。Google の項目では `{"<カレンダー ID>": false}`、iCal フィードでは `false` を指定します。
+
+```json
+{ "type": "google", "account": "me@example.com", "pendingAutoJoin": { "team@group.calendar.google.com": false } }
+{ "name": "Local", "path": "~/Calendars/team.ics", "pendingAutoJoin": false }
+```
+
 ## 設定
 
 パネルの **設定** ボタン、または `omarchy-shell kaigi openSettings` で設定画面が開きます。
 次のタブがあり、変更はその場で保存されます。
 
-- **一般**: 自動参加、開始と終了の通知とそれぞれのタイミング、会議の開き方
+- **一般**: 自動参加（未返答の招待も開くかどうかはカレンダーごと）、開始と終了の通知とそれぞれのタイミング、会議の開き方
 - **カレンダー**: Google アカウント（追加・ログアウト）、アカウントごとに表示するカレンダー、アカウントごとの Chrome プロファイル、iCal フィード、表示する期間
 - **表示**: バーの予定タイトル、残り時間、タイトルの文字数、進行中の会議の扱い、「近い予定だけ表示」、メニューのタイトル文字数と終了時刻
 - **予定**: 終日の予定、会議リンクのない予定、参加者のいない予定、終わった予定、未返答・仮承諾・辞退した予定
@@ -129,7 +143,7 @@ Google の項目と並べて、あるいは代わりに、`.ics` のURLやファ
 | `pastEventsAppereance` | `show_inactive` | `show_inactive`、`hide` |
 | `joinEventNotification` / `…Time` | `true` / `0` | 開始の N 秒前に通知する |
 | `endOfEventNotification` / `…Time` | `true` / `0` | 終了の N 秒前に通知する |
-| `automaticEventJoin` / `…Time` | `false` / `0` | 開始の N 秒前に会議を開く。未返答や仮承諾の招待も対象。除きたいときは `showPendingEvents` / `showTentativeEvents` を `hide` にする（メニューからも消える） |
+| `automaticEventJoin` / `…Time` | `false` / `0` | 開始の N 秒前に会議を開く。未返答や仮承諾の招待も対象。未返答の招待を一部のカレンダーだけ除くときは[未返答の招待の自動参加](#未返答の招待の自動参加)を参照。`showPendingEvents` / `showTentativeEvents` を `hide` にすると全カレンダーで除かれる（メニューからも消える） |
 | `actionGraceSeconds` | `300` | スリープ明けなどで時刻を過ぎていても、この秒数以内なら実行する |
 | `openMeetingsIn` | `browser` | `browser` は `xdg-open` で既定のブラウザに開く。`webapp` は `omarchy-launch-webapp` で、今いるワークスペースに単独のウィンドウとして開く（Chrome 系ブラウザのみ） |
 | `providerOpeningModes` | `{}` | サービスごとの開き方。例: `{"zoom": "zoomApp", "teams": "teamsApp"}`。値は `default`（`openMeetingsIn` に従う）、`browser`、`webapp`、または下の「対応サービス」にあるアプリの指定。アプリが入っていなければブラウザで開く |

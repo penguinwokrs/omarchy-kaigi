@@ -239,6 +239,63 @@ class MainTests(unittest.TestCase):
             self.assertEqual([e["title"] for e in out["events"]], ["Keep"])
             self.assertEqual(out["events"][0]["browserProfile"], "Profile 3")
 
+    def test_pending_auto_join_setting(self):
+        cal_entry = {"name": "Local"}
+        self.assertTrue(me.pending_auto_join(cal_entry))
+        self.assertFalse(me.pending_auto_join({"pendingAutoJoin": False}))
+        self.assertTrue(me.pending_auto_join({"pendingAutoJoin": "no"}))  # junk falls back to the default
+        team_off = {"pendingAutoJoin": {"team": False, "bad": "x"}}
+        self.assertFalse(me.pending_auto_join(team_off, "team"))
+        self.assertTrue(me.pending_auto_join(team_off, "me@example.com"))
+        self.assertEqual(me.pending_auto_join_map(team_off), {"team": False})
+        self.assertEqual(me.pending_auto_join_map({"pendingAutoJoin": False}), {})
+
+    def test_feed_with_pending_auto_join_off(self):
+        with tempfile.TemporaryDirectory() as d:
+            ics = os.path.join(d, "a.ics")
+            with open(ics, "w") as fh:
+                fh.write(cal(vevent(UID="1", SUMMARY="Invite", DTSTART="20261116T010000Z", DTEND="20261116T020000Z")))
+            cfg = os.path.join(d, "config.json")
+            with open(cfg, "w") as fh:
+                json.dump({"calendars": [{"name": "Off", "path": ics, "pendingAutoJoin": False},
+                                         {"name": "On", "path": ics}]}, fh)
+            import contextlib
+            import io
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                me.main(["--config", cfg, "--now", str(int(dt.datetime(2026, 11, 16, 8, tzinfo=TOKYO).timestamp() * 1000))])
+            out = json.loads(buf.getvalue())
+            self.assertEqual(sorted((e["calendar"], e["autoJoinPending"]) for e in out["events"]),
+                             [("Off", False), ("On", True)])
+            self.assertEqual([(f["name"], f["pendingAutoJoin"]) for f in out["feeds"]], [("Off", False), ("On", True)])
+
+    def test_google_calendar_with_pending_auto_join_off(self):
+        start = {"dateTime": "2026-11-16T10:00:00+09:00"}
+        end = {"dateTime": "2026-11-16T10:30:00+09:00"}
+        me_ = {"email": "me@example.com", "self": True, "responseStatus": "needsAction"}
+        snap = {"calendars": [{"id": "me@example.com", "summary": "Me"}, {"id": "team", "summary": "Team"}],
+                "events": {"me@example.com": [{"id": "1", "summary": "Mine", "start": start, "end": end, "attendees": [me_]}],
+                           "team": [{"id": "2", "summary": "Team sync", "start": start, "end": end, "attendees": [me_]}]}}
+        real_load = me.google.load
+        me.google.load = lambda *a, **k: (snap, None)
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                cfg = os.path.join(d, "config.json")
+                with open(cfg, "w") as fh:
+                    json.dump({"calendars": [{"type": "google", "account": "default",
+                                              "pendingAutoJoin": {"team": False}}]}, fh)
+                import contextlib
+                import io
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    me.main(["--config", cfg, "--now", str(int(dt.datetime(2026, 11, 16, 8, tzinfo=TOKYO).timestamp() * 1000))])
+                out = json.loads(buf.getvalue())
+        finally:
+            me.google.load = real_load
+        self.assertEqual({e["title"]: (e["calendarId"], e["participation"], e["autoJoinPending"]) for e in out["events"]},
+                         {"Mine": ("me@example.com", "pending", True), "Team sync": ("team", "pending", False)})
+        self.assertEqual(out["accounts"][0]["pendingAutoJoin"], {"team": False})
+
     def test_missing_config_is_unconfigured(self):
         import contextlib
         import io

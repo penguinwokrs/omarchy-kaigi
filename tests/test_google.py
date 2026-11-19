@@ -347,6 +347,7 @@ class ConvertTests(unittest.TestCase):
         self.assertEqual(got["Mine"]["participation"], "accepted")
         self.assertEqual(got["Sync"]["end"] - got["Sync"]["start"], 30 * 60 * 1000)
         self.assertEqual(got["Sync"]["color"], "#4285f4")
+        self.assertEqual(got["Sync"]["calendarId"], "me@example.com")
 
     def test_title_filters(self):
         base = {"start": {"dateTime": "2026-11-16T12:00:00+09:00"}, "end": {"dateTime": "2026-11-16T13:00:00+09:00"}}

@@ -211,3 +211,43 @@ test("queued Google requests run in order, with a sign-in last", () => {
   assert.equal(M.googleDequeue(null), null)
   assert.deepEqual(M.googleDequeue([LOGIN]), { args: LOGIN, rest: [] })
 })
+
+test("a calendar can stop auto-joining unanswered invitations; notifications still fire", () => {
+  const cfg = { automaticEventJoin: true, automaticEventJoinTime: 0, joinEventNotification: true, endOfEventNotification: false }
+  const off = ev(5, 30, { participation: "pending", autoJoinPending: false })
+  const unset = ev(5, 30, { participation: "pending" })
+  const accepted = ev(5, 30, { autoJoinPending: false })
+  const at = now + 5 * MIN
+  const kinds = (e) => M.dueActions([e], cfg, at, {}).map(d => d.kind).sort()
+  assert.deepEqual(kinds(off), ["eventStart"])
+  assert.deepEqual(kinds(unset), ["autoJoin", "eventStart"])
+  // The setting covers unanswered invitations only.
+  assert.deepEqual(kinds(accepted), ["autoJoin", "eventStart"])
+})
+
+test("menu rows mark unanswered invitations", () => {
+  const pending = ev(60, 30, { participation: "pending" })
+  const accepted = ev(90, 30)
+  const [today] = M.menuSections([pending, accepted], {}, now)
+  assert.deepEqual(today.rows.map(r => r.look.pending), [true, false])
+})
+
+test("pending auto-join rows list shown Google calendars and iCal feeds", () => {
+  const accounts = [{
+    account: "a", email: "a@example.com", configIndex: 0, calendarIds: [], activeIds: ["a@example.com", "team"],
+    pendingAutoJoin: { team: false },
+    calendars: [{ id: "a@example.com", summary: "Me", primary: true }, { id: "team", summary: "Team" }, { id: "hidden", summary: "Hidden" }]
+  }, {
+    account: "b", email: "b@example.com", configIndex: 2, calendarIds: ["primary"], activeIds: [],
+    calendars: [{ id: "b@example.com", summary: "B", primary: true }, { id: "other", summary: "Other" }]
+  }]
+  const feeds = [{ configIndex: 1, name: "Holidays", pendingAutoJoin: false }]
+  const rows = M.pendingAutoJoinRows(accounts, feeds)
+  assert.deepEqual(rows.map(r => [r.index, r.calendarId, r.name, r.owner, r.on]), [
+    [0, "a@example.com", "Me", "a@example.com", true],
+    [0, "team", "Team", "a@example.com", false],
+    [2, "b@example.com", "B", "b@example.com", true],
+    [1, "", "Holidays", "", false]
+  ])
+  assert.deepEqual(M.pendingAutoJoinRows([], []), [])
+})

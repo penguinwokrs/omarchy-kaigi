@@ -17,6 +17,7 @@ and ends, and can open the meeting by itself when it starts.
 │ ▍ 10:00 – 10:30  過去の打ち合わせ       │  (past: dimmed)
 │ ▍ 12:31 – 13:01  Kaigi テスト定例   󰕧 │
 │ ▍ 13:30 – 14:00  ~~辞退した会議~~      │  (declined: struck through)
+│ ▍ 15:00 – 15:30  採用面接  未返答   󰕧 │  (not answered: marked)
 │ 󰑐 更新   󰒓 設定                       │
 └──────────────────────────────────────┘
 ```
@@ -143,14 +144,31 @@ to the Google entry or instead of it:
 Only `https://` and `webcal://` URLs are fetched. For these feeds, `emails`
 says which attendee is you.
 
+### Auto-join for invitations you haven't answered
+
+Auto-join also opens invitations you haven't answered yet. To stop that for
+some calendars, turn them off under Settings → General → "Also auto-join
+invitations you haven't answered, from". Each Google calendar and each iCal
+feed has its own switch, and calendars you haven't set stay on. Turning one
+off stops only the auto-join; you still get the start and end notifications.
+
+In `config.json` this is `pendingAutoJoin` on the calendar entry:
+`{"<calendar id>": false}` on a Google entry, or `false` on an iCal feed.
+
+```json
+{ "type": "google", "account": "me@example.com", "pendingAutoJoin": { "team@group.calendar.google.com": false } }
+{ "name": "Local", "path": "~/Calendars/team.ics", "pendingAutoJoin": false }
+```
+
 ## Settings
 
 Open the settings window from the popup's **設定 / Settings** button, or run
 `omarchy-shell kaigi openSettings`. It has these tabs, and changes save
 immediately:
 
-- **General:** auto-join, start and end notifications with their timing, and
-  how and in which Chrome profile meetings open.
+- **General:** auto-join (and, per calendar, whether it opens invitations you
+  haven't answered), start and end notifications with their timing, and how
+  and in which Chrome profile meetings open.
 - **Calendars:** Google accounts (add or sign out), which calendars to show for
   each account, each account's Chrome profile, iCal feeds, and the display
   period.
@@ -179,7 +197,7 @@ use `omarchy-shell kaigi set <key> <json>`, for example
 | `pastEventsAppereance` | `show_inactive` | `show_inactive`, `hide` |
 | `joinEventNotification` / `…Time` | `true` / `0` | notification N seconds before start |
 | `endOfEventNotification` / `…Time` | `true` / `0` | notification N seconds before end |
-| `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start. This includes invitations you have not answered or answered "maybe"; set `showPendingEvents` / `showTentativeEvents` to `hide` to leave those out (which also hides them from the menu) |
+| `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start. This includes invitations you have not answered or answered "maybe". To leave out unanswered invitations from some calendars only, see [Auto-join for invitations you haven't answered](#auto-join-for-invitations-you-havent-answered). `showPendingEvents` / `showTentativeEvents` set to `hide` leave them out everywhere (and hide them from the menu) |
 | `actionGraceSeconds` | `300` | still fire this late, e.g. after suspend |
 | `openMeetingsIn` | `browser` | `browser` opens the link with `xdg-open` in your default browser. `webapp` opens it as its own window on the current workspace with `omarchy-launch-webapp` (Chromium-based browsers only) |
 | `providerOpeningModes` | `{}` | per-service opening, e.g. `{"zoom": "zoomApp", "teams": "teamsApp"}`. Values: `default` (follow `openMeetingsIn`), `browser`, `webapp`, or an app mode from "Supported services" below. Without the app installed, the link opens in the browser |
