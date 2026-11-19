@@ -136,6 +136,7 @@
   "appUnavailable.body": "代わりにブラウザで開きます。",
   "snooze": "%1分後にもう一度通知",
   "newMeeting": "新しい会議",
+  "newMeeting.chooseAccount": "作成するアカウント",
   "bookmarks": "ブックマーク",
   "details.attendees": "参加者（%1人）:",
   "details.more": "ほか%1人",

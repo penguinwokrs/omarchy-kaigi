@@ -136,6 +136,7 @@
   "appUnavailable.body": "Opening the meeting in the browser instead.",
   "snooze": "Remind me in %1 min",
   "newMeeting": "New meeting",
+  "newMeeting.chooseAccount": "Create it as",
   "bookmarks": "Bookmarks",
   "details.attendees": "Attendees (%1):",
   "details.more": "+%1 more",

@@ -50,6 +50,10 @@ Kaigi uses Google user data only for features you see on your own desktop:
 - open meeting links in the Chrome profile signed in to the same Google
   account, by matching your email address against Chrome's profile list on
   your computer
+- open Google Meet links, including new meetings you start from the popup,
+  as the right Google account, by adding your email address to the
+  meet.google.com link (the `authuser` parameter). Your browser sends that
+  link only to Google
 
 Kaigi does not use Google user data for advertising, profiling, analytics,
 credit or lending decisions, or any purpose other than these features. Kaigi

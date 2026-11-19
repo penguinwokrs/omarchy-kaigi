@@ -340,14 +340,41 @@ var CREATE_MEETING = [
   { service: "jitsi", name: "Jitsi Meet", url: "https://meet.jit.si/" }
 ]
 
+function createMeetingEntry(service) {
+  for (var i = 0; i < CREATE_MEETING.length; i++) if (CREATE_MEETING[i].service === service) return CREATE_MEETING[i]
+  return CREATE_MEETING[0]
+}
+
 // random: a function returning [0, 1), for Jitsi's room name.
-function createMeetingUrl(service, random) {
-  var entry = CREATE_MEETING[0]
-  for (var i = 0; i < CREATE_MEETING.length; i++) if (CREATE_MEETING[i].service === service) entry = CREATE_MEETING[i]
+// email: for Meet, the Google account to create it as (authuser, the way
+// joining adds it). meet.new always redirects to authuser=0, and with a
+// query it redirects to www.google.com, so this uses meet.google.com/new,
+// MeetingBar's URL.
+function createMeetingUrl(service, random, email) {
+  var entry = createMeetingEntry(service)
+  if (entry.service === "meet" && email) return "https://meet.google.com/new?authuser=" + encodeURIComponent(email)
   if (entry.service !== "jitsi") return entry.url
   var letters = "abcdefghijkmnpqrstuvwxyz23456789", room = "Kaigi-"
   for (var j = 0; j < 12; j++) room += letters.charAt(Math.floor((random || Math.random)() * letters.length))
   return entry.url + room
+}
+
+// The signed-in Google accounts a new Meet meeting can be created as, from
+// kaigi-events' accounts list (one entry per Google calendar; several can
+// share an account): [{ email, profile }], one per address, in config order.
+// profile is the account's Chrome profile (per calendar, else the global
+// one), which only applies when meetings open as web apps.
+function createMeetingAccounts(accounts, config) {
+  var out = [], seen = {}
+  var fallback = String((config && config.chromeProfile) || "")
+  for (var i = 0; i < (accounts || []).length && out.length < 10; i++) {
+    var a = accounts[i]
+    var email = a && typeof a.email === "string" ? a.email.trim() : ""
+    if (!email || seen[email.toLowerCase()]) continue
+    seen[email.toLowerCase()] = true
+    out.push({ email: email, profile: String(a.chromeProfile || "") || fallback })
+  }
+  return out
 }
 
 // Bookmarks are lines "Name https://…" (the URL is the last word) or a bare
@@ -628,6 +655,7 @@ if (typeof module !== "undefined") {
     withDismissed: withDismissed,
     CREATE_MEETING: CREATE_MEETING,
     createMeetingUrl: createMeetingUrl,
+    createMeetingAccounts: createMeetingAccounts,
     parseBookmarks: parseBookmarks,
     attendeeSummary: attendeeSummary,
     pendingAutoJoinRows: pendingAutoJoinRows,

@@ -275,8 +275,12 @@ service can also be set to `browser` or `webapp` on its own.
 - **Popup:** click an event to join it. The ⌄ button at the right of an event
   (or a click on an event without a meeting link) shows its location,
   attendees and description, and a **Hide this event** button. **New meeting**
-  opens a new meeting on the service set in Settings → General, and
-  **Bookmarks** lists your saved meeting links.
+  opens a new meeting on the service set in Settings → General. For Google
+  Meet with more than one Google account signed in, it first lists the
+  accounts so you can pick which one to create the meeting as (Kaigi adds
+  `authuser` to the Meet link, as it does when joining; with `webapp`, the
+  account's Chrome profile is used too). **Bookmarks** lists your saved
+  meeting links.
 - **Popup keys:** ↑/↓ (or k/j) to choose an event, →/← to show or close its
   details, Enter to join it, `n` to join the next meeting, `r` to refresh, Esc
   to close. Enter works only when an event is selected.
@@ -290,7 +294,10 @@ service can also be set to `browser` or `webapp` on its own.
   - `omarchy-shell kaigi googleLogin`
   - `omarchy-shell kaigi openSettings`
   - `omarchy-shell kaigi createMeeting <meet|zoom|teams|jitsi>` (`""` for the
-    one set in Settings)
+    one set in Settings). For Meet with several accounts signed in it opens
+    without choosing one, as before
+  - `omarchy-shell kaigi createMeetingAs meet <email>` (a Meet meeting as
+    that signed-in account)
   - `omarchy-shell kaigi set <key> <json>`
   - `omarchy-shell penguinwokrs.kaigi toggle`
 

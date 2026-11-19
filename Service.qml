@@ -305,16 +305,42 @@ Item {
   function restoreDismissed() { saveConfig({ dismissedEvents: [] }) }
 
   // A link outside the calendar (a new meeting, a bookmark): browser or web
-  // app per openMeetingsIn, in the default Chrome profile.
-  function openUrl(url) {
+  // app per openMeetingsIn. A web app opens in `profile`, else the global
+  // chromeProfile.
+  function openUrl(url, profile) {
     if (!Model.launchableUrl(url)) return false
     var webapp = root.config.openMeetingsIn === "webapp" && /^https?:\/\//.test(url)
-    Util.execArgv(launchArgv({ via: webapp ? "webapp" : "browser", url: url }, root.config.chromeProfile))
+    Util.execArgv(launchArgv({ via: webapp ? "webapp" : "browser", url: url }, profile || root.config.chromeProfile))
     return true
   }
 
-  function createMeeting(service) {
-    return openUrl(Model.createMeetingUrl(service || root.config.createMeetingService))
+  // Google accounts a new Meet meeting can be created as (Model.createMeetingAccounts).
+  readonly property var createMeetingAccounts: Model.createMeetingAccounts(calendarAccounts, config)
+
+  function newMeetingService(service) {
+    var name = String(service || root.config.createMeetingService || "")
+    // An unknown name opens Meet (Model.createMeetingUrl).
+    return Model.CREATE_MEETING.some(function(c) { return c.service === name }) ? name : "meet"
+  }
+
+  // The popup asks which account when a Meet meeting has more than one to
+  // choose from.
+  function createMeetingNeedsAccount(service) {
+    return newMeetingService(service) === "meet" && root.createMeetingAccounts.length > 1
+  }
+
+  // email picks the account for Meet; with one account signed in it is used
+  // without asking. An address that is not signed in is refused.
+  function createMeeting(service, email) {
+    var name = newMeetingService(service)
+    var accounts = name === "meet" ? root.createMeetingAccounts : []
+    var account = accounts.length === 1 && !email ? accounts[0] : null
+    if (email) {
+      for (var i = 0; i < accounts.length; i++)
+        if (accounts[i].email.toLowerCase() === String(email).toLowerCase()) account = accounts[i]
+      if (!account) return false
+    }
+    return openUrl(Model.createMeetingUrl(name, null, account ? account.email : ""), account ? account.profile : "")
   }
 
   function perform(action) {
@@ -493,7 +519,11 @@ Item {
     function closeSettings(): string { settingsWindow.close(); return "ok" }
     // From the start notification's "Remind me again" button.
     function snooze(id: string): string { return root.snooze(id) ? "ok" : "unknown event" }
-    function createMeeting(service: string): string { return root.createMeeting(service) ? "ok" : "failed" }
+    function createMeeting(service: string): string { return root.createMeeting(service, "") ? "ok" : "failed" }
+    // A Meet meeting as the signed-in account with this address.
+    function createMeetingAs(service: string, email: string): string {
+      return root.createMeeting(service, email) ? "ok" : "no Meet account with that address"
+    }
     // omarchy-shell kaigi set <key> <json value>, e.g. set eventTimeFormat '"hide"'
     function set(key: string, valueJson: string): string {
       if (!/^[A-Za-z][A-Za-z0-9]{0,60}$/.test(key) || key === "calendars") return "invalid key"

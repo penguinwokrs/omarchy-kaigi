@@ -292,6 +292,15 @@ test("new meeting URLs and bookmarks", () => {
   assert.equal(M.createMeetingUrl("unknown"), "https://meet.new")
   assert.match(M.createMeetingUrl("jitsi", () => 0), /^https:\/\/meet\.jit\.si\/Kaigi-a{12}$/)
   for (const c of M.CREATE_MEETING) assert.ok(M.launchableUrl(M.createMeetingUrl(c.service)), c.service)
+  assert.equal(M.createMeetingUrl("meet", null, "me+x@example.com"), "https://meet.google.com/new?authuser=me%2Bx%40example.com")
+  assert.equal(M.createMeetingUrl("zoom", null, "me@example.com"), "https://zoom.us/start/videomeeting")
+  assert.ok(M.launchableUrl(M.createMeetingUrl("meet", null, "me@example.com")))
+  assert.deepEqual(M.createMeetingAccounts([
+    { email: "work@example.com", chromeProfile: "Profile 2" }, { email: "Work@example.com", chromeProfile: "Profile 9" },
+    { email: "" }, { email: "me@gmail.com", chromeProfile: "" }, null], { chromeProfile: "Default" }), [
+    { email: "work@example.com", profile: "Profile 2" }, { email: "me@gmail.com", profile: "Default" }
+  ])
+  assert.deepEqual(M.createMeetingAccounts(undefined, {}), [])
   assert.deepEqual(M.parseBookmarks(["Daily standup https://meet.google.com/abc-defg-hij", "https://zoom.us/j/1",
     "no url here", "x javascript:alert(1)", 42]), [
     { name: "Daily standup", url: "https://meet.google.com/abc-defg-hij" },

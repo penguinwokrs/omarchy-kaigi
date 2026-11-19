@@ -116,6 +116,16 @@ Panel {
   // ---- bookmarks ----
   readonly property var bookmarks: Model.parseBookmarks(config.bookmarks)
 
+  // ---- new meeting ----
+  // With several Google accounts signed in, "New meeting" (Meet) first lists
+  // them to choose which one to create it as.
+  property bool choosingAccount: false
+  function newMeeting() {
+    if (!service) return
+    if (service.createMeetingNeedsAccount("")) choosingAccount = !choosingAccount
+    else if (service.createMeeting("", "")) close()
+  }
+
   // ---- keyboard cursor over joinable rows ----
   property int cursor: -1
   readonly property var sections: Model.menuSections(events, config, now)
@@ -142,6 +152,7 @@ Panel {
   onOpenedChanged: {
     cursor = -1
     expandedId = ""
+    choosingAccount = false
     if (opened && service) service.refresh(false)
   }
 
@@ -574,7 +585,7 @@ Panel {
               foreground: root.foreground
               fontFamily: root.fontFamily
               enabled: !!root.service
-              onClicked: { if (root.service.createMeeting("")) root.close() }
+              onClicked: root.newMeeting()
             }
             Button {
               iconText: "󰑐" // nf-md-refresh
@@ -589,6 +600,33 @@ Panel {
               foreground: root.foreground
               fontFamily: root.fontFamily
               onClicked: root.openSettings()
+            }
+          }
+
+          // ---- new meeting: which account ----
+          Column {
+            width: parent.width
+            spacing: Style.space(2)
+            visible: root.choosingAccount && !!root.service && root.service.createMeetingNeedsAccount("")
+
+            PanelSectionHeader {
+              width: parent.width
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              text: strings.t("newMeeting.chooseAccount")
+            }
+            Repeater {
+              model: root.choosingAccount && root.service ? root.service.createMeetingAccounts : []
+              Button {
+                required property var modelData
+                width: column.width
+                leftAlign: true
+                iconText: "󰊭" // nf-md-google
+                text: modelData.email
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                onClicked: { if (root.service.createMeeting("", modelData.email)) root.close() }
+              }
             }
           }
 
