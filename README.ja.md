@@ -119,11 +119,11 @@ Google のカレンダー1つずつと iCal フィード1本ずつにスイッ�
 パネルの **設定** ボタン、または `omarchy-shell kaigi openSettings` で設定画面が開きます。
 次のタブがあり、変更はその場で保存されます。
 
-- **一般**: 自動参加（未返答の招待も開くかどうかはカレンダーごと）、会議の開き方
+- **一般**: 自動参加（未返答の招待も開くかどうかはカレンダーごと）、会議の開き方、新しい会議を作るサービス、ブックマーク、フック
 - **通知**: 開始と終了の通知とそれぞれのタイミング
 - **カレンダー**: Google アカウント（追加・ログアウト）、アカウントごとに表示するカレンダー、アカウントごとの Chrome プロファイル、iCal フィード、表示する期間
 - **表示**: バーの予定タイトル、残り時間、タイトルの文字数、進行中の会議の扱い、「近い予定だけ表示」、メニューのタイトル文字数と終了時刻
-- **予定**: 終日の予定、会議リンクのない予定、参加者のいない予定、終わった予定、未返答・仮承諾・辞退した予定
+- **予定**: 終日の予定、会議リンクのない予定、参加者のいない予定、終わった予定、未返答・仮承諾・辞退した予定、非表示にした予定（元に戻す）
 - **詳細**: タイトルのフィルタ、追加の会議リンクのパターン、更新間隔、猶予時間、設定ファイルを開く
 
 設定はすべて `~/.config/kaigi/config.json`（本人だけが読める権限）に保存されます。
@@ -151,7 +151,25 @@ Google のカレンダー1つずつと iCal フィード1本ずつにスイッ�
 | `chromeProfile` | `""` | `webapp` のときに会議を開く Chrome のプロファイルのフォルダ名（`Default`、`Profile 2` など。`chrome://version` で確認できる）。カレンダーごとにも指定できる。空なら最後に使ったプロファイル。Google アカウントをプロファイルで分けている場合に便利 |
 | `customRegexes` | `[]` | 追加の会議リンクのパターン。最後に試す |
 | `filterEventRegexes` | `[]` | タイトルが一致した予定を隠す |
-| `dismissedEvents` | `[]` | 無視する予定のID |
+| `dismissedEvents` | `[]` | 「この予定を非表示」で非表示にした予定のID。通知と自動参加の対象からも外れる |
+| `createMeetingService` | `meet` | パネルの「新しい会議」で開くサービス: `meet`、`zoom`、`teams`、`jitsi` |
+| `bookmarks` | `[]` | パネルに並べる、よく使う会議のリンク: `["Daily https://meet.google.com/…", …]`（名前のあとにURL） |
+| `eventHooks` | `false` | 会議の開始・終了時にフックを実行する（[フック](#フック)を参照） |
+
+
+### フック
+
+`eventHooks` をオンにすると、会議の開始時に `omarchy-hook kaigi-event-start`、終了時に `omarchy-hook kaigi-event-end` を実行します。
+`~/.config/omarchy/hooks/kaigi-event-start` と `~/.config/omarchy/hooks/kaigi-event-end`（または `….d/` フォルダ）に実行可能なスクリプトを置いてください。
+スクリプトは次の引数を受け取ります。
+
+1. タイトル
+2. 開始時刻（ISO 8601、UTC）
+3. 終了時刻（ISO 8601、UTC）
+4. 会議のリンク（なければ空）
+5. カレンダー名
+
+フックの対象は通知と同じです。辞退・キャンセル・終日・非表示にした予定は対象外で、同じ予定で二度は実行しません。
 
 **表示の設定**も `config.json` に入ります。`shell.json` のバーの項目
 （`omarchy bar set penguinwokrs.kaigi <キー> <値>`）の値は、`config.json` に設定がないときだけ使われます。
@@ -184,18 +202,19 @@ Google のカレンダー1つずつと iCal フィード1本ずつにスイッ�
 
 イベントに `zoommtg://` のリンクが直接書かれている場合は、そのまま Zoom アプリで開きます（なければ https に戻してブラウザで開く）。`discord://` のリンクは Discord アプリで開きます。どのサービスも `browser` か `webapp` を個別に指定できます。
 
-MeetingBar にある Google Meet の「Meet in One」と「Google Meet PWA」は macOS 専用のため、代わりに `webapp`（Omarchy の Web アプリとして開く）を使ってください。FaceTime と電話番号のリンクも macOS 専用なので、対応していません（FaceTime の https リンクはブラウザで開きます）。
-
 ## マウス・キー・IPC
 
 - **バー**: 左クリックでパネルを開く。中クリックで次の会議に参加する。右クリックでカレンダーを取り直す。
-- **パネル**: ↑/↓（または k/j）で予定を選び、Enter で参加する。`n` で次の会議に参加、`r` で更新、Esc で閉じる。Enter は予定を選んでいるときだけ効きます。
+- **パネル**: 予定をクリックすると会議に参加します。予定の右端の ⌄ ボタン（会議リンクのない予定はクリックでも）で、場所・参加者・説明と「この予定を非表示」ボタンを表示します。「新しい会議」で、設定の「一般」で選んだサービスの会議を新しく作ります。「ブックマーク」には登録した会議のリンクが並びます。
+- **パネルのキー**: ↑/↓（または k/j）で予定を選び、→/← で詳細を開く・閉じる、Enter で参加する。`n` で次の会議に参加、`r` で更新、Esc で閉じる。Enter は予定を選んでいるときだけ効きます。
+- **通知**: 開始の通知には「参加」と「5分後にもう一度通知」のボタンがあります。もう一度届いた通知にも同じボタンがあるので、また後にできます。
 - **IPC**:
   - `omarchy-shell kaigi joinNext`（キーに割り当てると便利）
   - `omarchy-shell kaigi refresh`
   - `omarchy-shell kaigi next`
   - `omarchy-shell kaigi googleLogin`
   - `omarchy-shell kaigi openSettings`
+  - `omarchy-shell kaigi createMeeting <meet|zoom|teams|jitsi>`（`""` なら設定で選んだサービス）
   - `omarchy-shell kaigi set <キー> <JSON>`
   - `omarchy-shell penguinwokrs.kaigi toggle`
 
@@ -204,7 +223,7 @@ MeetingBar にある Google Meet の「Meet in One」と「Google Meet PWA」は
 - `bin/kaigi_google.py` と `bin/kaigi-google` が Google へのログインと Calendar API を担当します。Python の標準ライブラリだけで動きます。
 - `bin/kaigi-events` も標準ライブラリだけで動きます。フィードを読み、繰り返しの予定（RRULE、EXDATE、RDATE、RECURRENCE-ID、タイムゾーン、夏時間）を展開し、`bin/services.json` にある69種類のサービスのパターンで会議リンクを探します。会議アプリの URL スキーム（`zoommtg` など）が登録されているかも調べます。結果は JSON で出力します。
 - `Service.qml` はシェルに1つだけ常駐します。1分ごとにヘルパーを呼び、5秒ごとに通知や自動参加の時刻を確認します。通知や参加の前に、その操作を `~/.local/state/kaigi/fired.json` に記録します。そのため、モニターが複数あっても、プラグインの再読み込みや `omarchy restart shell` をしても、同じ操作は繰り返されません。
-- 開くのは、既知のサービス（または `customRegexes`）に一致した `https`、`http`、`zoommtg`、`discord` のURLと、そこから作った会議アプリ用のURL（`msteams`、`jitsi-meet`、`slack`、`riversidefm`、`tuple`、`workchat`）だけです。URLはシェルを通さず、引数として渡します。
+- 開くのは、既知のサービス（または `customRegexes`）に一致した `https`、`http`、`zoommtg`、`discord` のURLと、そこから作った会議アプリ用のURL（`msteams`、`jitsi-meet`、`slack`、`riversidefm`、`tuple`、`workchat`）、それに同じスキームのブックマークと新しい会議のページだけです。URLはシェルを通さず、引数として渡します。
 - `Panel.qml` がバーのウィジェットとパネル、`SettingsWindow.qml` が設定画面です。`Model.js` に予定の選び方、表示、タイミングの計算が入っています。
 
 ## 開発
@@ -218,21 +237,6 @@ MeetingBar にある Google Meet の「Meet in One」と「Google Meet PWA」は
 python3 -m unittest discover -s tests
 TZ=Asia/Tokyo node --test tests/
 ```
-
-## まだ移植していないもの
-
-この版には、MeetingBar の次の機能はありません。
-
-- macOS のカレンダー（EventKit）連携。Linux で同じことをするなら GNOME Online Accounts
-- 全画面のリマインダー
-- スヌーズ
-- ブックマーク
-- AppleScript やショートカットとの連携
-- その場での会議の作成
-- サービスごとに別のブラウザ（Firefox、Safari など）を選ぶ機能。Kaigi では「既定のブラウザ」か「Webアプリ」を選べます
-- メニューのタイムライン
-- 予定の詳細のサブメニュー
-- メニューから個別の予定を非表示にする機能
 
 ## プライバシー
 

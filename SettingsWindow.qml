@@ -456,6 +456,21 @@ Item {
         }
       }
       Note { text: strings.t("settings.servicesNote") }
+
+      Heading { text: strings.t("settings.newMeeting") }
+      ChoiceRow {
+        key: "createMeetingService"
+        label: strings.t("settings.newMeeting.service")
+        options: Model.CREATE_MEETING.map(function(c) { return { value: c.service, label: c.name } })
+      }
+
+      Heading { text: strings.t("bookmarks") }
+      ListEditor { key: "bookmarks"; title: strings.t("settings.bookmarks"); hint: "Daily https://meet.google.com/abc-defg-hij" }
+      Note { text: strings.t("settings.bookmarksNote") }
+
+      Heading { text: strings.t("settings.hooks") }
+      SwitchRow { key: "eventHooks"; label: strings.t("settings.hooks.label"); description: strings.t("settings.hooks.desc") }
+      Note { text: strings.t("settings.hooksNote") }
     }
   }
 
@@ -710,6 +725,22 @@ Item {
         key: "declinedEventsAppereance"
         label: strings.t("settings.declined")
         options: [{ value: "strikethrough", label: strings.t("settings.strikethrough") }, { value: "hide", label: strings.t("settings.hide") }]
+      }
+
+      Heading { text: strings.t("settings.dismissed") }
+      Note {
+        text: (Array.isArray(root.cfg.dismissedEvents) && root.cfg.dismissedEvents.length > 0)
+          ? strings.t("settings.dismissed.count").arg(root.cfg.dismissedEvents.length)
+          : strings.t("settings.dismissed.none")
+      }
+      Button {
+        visible: Array.isArray(root.cfg.dismissedEvents) && root.cfg.dismissedEvents.length > 0
+        iconText: "\uDB80\uDE08"
+        text: strings.t("settings.dismissed.restore")
+        foreground: root.fg
+        fontFamily: root.fontFamily
+        enabled: !!root.service
+        onClicked: root.service.restoreDismissed()
       }
     }
   }

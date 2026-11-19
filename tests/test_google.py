@@ -313,7 +313,8 @@ class FetchTests(unittest.TestCase):
 
 class ConvertTests(unittest.TestCase):
     helpers = {"find_link": me.find_link, "add_authuser": me.add_authuser, "strip_html": me.strip_html,
-               "clip": me.clip, "to_ms": me.to_ms, "max_title": 300, "max_text": 4000}
+               "clip": me.clip, "to_ms": me.to_ms, "max_title": 300, "max_text": 4000,
+               "notes_text": me.notes_text, "attendee_list": me.attendee_list}
 
     def convert(self, items, filters=()):
         snap = {"calendars": [{"id": "me@example.com", "summary": "Me", "color": "#4285f4"}],
@@ -348,6 +349,15 @@ class ConvertTests(unittest.TestCase):
         self.assertEqual(got["Sync"]["end"] - got["Sync"]["start"], 30 * 60 * 1000)
         self.assertEqual(got["Sync"]["color"], "#4285f4")
         self.assertEqual(got["Sync"]["calendarId"], "me@example.com")
+        self.assertEqual(got["Sync"]["attendeeCount"], 2)
+        self.assertEqual(got["Sync"]["attendees"], [
+            {"name": "x@example.com", "response": "accepted", "self": False, "organizer": False},
+            {"name": "me@example.com", "response": "pending", "self": True, "organizer": False}])
+
+    def test_notes_are_plain_text(self):
+        base = {"start": {"dateTime": "2026-11-16T10:00:00+09:00"}, "end": {"dateTime": "2026-11-16T10:30:00+09:00"}}
+        got = self.convert([dict(base, id="n", summary="N", description="<p>Agenda</p><br><br><br>Item &amp; more")])
+        self.assertEqual(got[0]["notes"], "Agenda\n\nItem & more")
 
     def test_title_filters(self):
         base = {"start": {"dateTime": "2026-11-16T12:00:00+09:00"}, "end": {"dateTime": "2026-11-16T13:00:00+09:00"}}

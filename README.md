@@ -167,7 +167,8 @@ Open the settings window from the popup's **設定 / Settings** button, or run
 immediately:
 
 - **General:** auto-join (and, per calendar, whether it opens invitations you
-  haven't answered), and how and in which Chrome profile meetings open.
+  haven't answered), how and in which Chrome profile meetings open, the
+  service for new meetings, bookmarks, and hooks.
 - **Notifications:** start and end notifications with their timing.
 - **Calendars:** Google accounts (add or sign out), which calendars to show for
   each account, each account's Chrome profile, iCal feeds, and the display
@@ -175,7 +176,8 @@ immediately:
 - **Appearance:** the bar title, time left, title length, the ongoing-meeting
   rule, "only events starting soon", and the menu title length and end time.
 - **Events:** all-day events, events without a meeting link, events without
-  attendees, past events, and pending, tentative and declined events.
+  attendees, past events, pending, tentative and declined events, and events
+  you hid (show them again).
 - **Advanced:** title filters, extra link patterns, refresh interval, grace
   period, and opening the config file.
 
@@ -204,7 +206,27 @@ use `omarchy-shell kaigi set <key> <json>`, for example
 | `chromeProfile` | `""` | With `webapp`: the Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Also settable per calendar. Empty means the last used profile. Useful if you keep Google accounts in separate Chrome profiles |
 | `customRegexes` | `[]` | extra link patterns, tried last |
 | `filterEventRegexes` | `[]` | hide events whose title matches |
-| `dismissedEvents` | `[]` | event ids to ignore |
+| `dismissedEvents` | `[]` | ids of events you hid with "Hide this event"; they get no notifications or auto-join either |
+| `createMeetingService` | `meet` | service the popup's "New meeting" opens: `meet`, `zoom`, `teams`, `jitsi` |
+| `bookmarks` | `[]` | meeting links you use often, listed in the popup: `["Daily https://meet.google.com/…", …]` (a name, then the URL) |
+| `eventHooks` | `false` | run hooks when meetings start and end (see [Hooks](#hooks)) |
+
+### Hooks
+
+With `eventHooks` on, Kaigi runs `omarchy-hook kaigi-event-start` when a
+meeting starts and `omarchy-hook kaigi-event-end` when it ends. Put
+executable scripts at `~/.config/omarchy/hooks/kaigi-event-start` and
+`~/.config/omarchy/hooks/kaigi-event-end` (or in `….d/` folders). They get
+these arguments:
+
+1. title
+2. start time (ISO 8601, UTC)
+3. end time (ISO 8601, UTC)
+4. meeting link (empty if none)
+5. calendar name
+
+Hooks follow the same rules as notifications: declined, cancelled, all-day
+and hidden events are skipped, and each one runs once.
 
 **Display** options also live in `config.json`. Values in the bar entry in
 `shell.json` (`omarchy bar set penguinwokrs.kaigi <key> <value>`) are used
@@ -245,24 +267,29 @@ A `zoommtg://` link in the event opens in the Zoom app directly (or, without
 it, as https in the browser), and `discord://` links open in Discord. Every
 service can also be set to `browser` or `webapp` on its own.
 
-MeetingBar's Google Meet modes "Meet in One" and "Google Meet PWA" are
-macOS-only; use `webapp` (an Omarchy web app window) instead. FaceTime and
-phone links are macOS-only too and are not supported (FaceTime https links
-open in the browser).
-
 ## Mouse, keys, IPC
 
 - **Bar:** left-click opens the popup, middle-click joins the next meeting,
   right-click refetches the feeds.
-- **Popup:** ↑/↓ (or k/j) to choose an event, Enter to join it, `n` to join
-  the next meeting, `r` to refresh, Esc to close. Enter works only when an
-  event is selected.
+- **Popup:** click an event to join it. The ⌄ button at the right of an event
+  (or a click on an event without a meeting link) shows its location,
+  attendees and description, and a **Hide this event** button. **New meeting**
+  opens a new meeting on the service set in Settings → General, and
+  **Bookmarks** lists your saved meeting links.
+- **Popup keys:** ↑/↓ (or k/j) to choose an event, →/← to show or close its
+  details, Enter to join it, `n` to join the next meeting, `r` to refresh, Esc
+  to close. Enter works only when an event is selected.
+- **Notifications:** the start notification has **Join** and **Remind me in 5
+  min** buttons. The reminder has the same buttons, so you can put it off
+  again.
 - **IPC:**
   - `omarchy-shell kaigi joinNext` (bind it to a key)
   - `omarchy-shell kaigi refresh`
   - `omarchy-shell kaigi next`
   - `omarchy-shell kaigi googleLogin`
   - `omarchy-shell kaigi openSettings`
+  - `omarchy-shell kaigi createMeeting <meet|zoom|teams|jitsi>` (`""` for the
+    one set in Settings)
   - `omarchy-shell kaigi set <key> <json>`
   - `omarchy-shell penguinwokrs.kaigi toggle`
 
@@ -282,8 +309,8 @@ open in the browser).
 - Only URLs that match a known service (or your `customRegexes`) with an
   `https`, `http`, `zoommtg` or `discord` scheme, and the meeting-app URLs
   built from them (`msteams`, `jitsi-meet`, `slack`, `riversidefm`, `tuple`,
-  `workchat`), are opened. They are passed as
-  argv, never through a shell.
+  `workchat`), are opened, as well as your bookmarks and new-meeting pages
+  with the same schemes. They are passed as argv, never through a shell.
 - `Panel.qml` is the bar widget and popup, and `SettingsWindow.qml` is the
   settings window. `Model.js` holds the event selection, formatting and
   scheduling logic.
@@ -300,23 +327,6 @@ Saving files under the plugin folder hot-reloads the bar widget. Changes to
 python3 -m unittest discover -s tests
 TZ=Asia/Tokyo node --test tests/
 ```
-
-## Not ported (yet)
-
-These MeetingBar features are not in this version:
-
-- macOS Calendar (EventKit): its Linux counterpart would be GNOME Online
-  Accounts
-- full-screen reminders
-- snooze
-- bookmarks
-- AppleScript/Shortcuts hooks
-- ad-hoc meeting creation
-- a different browser (Firefox, Safari, …) per service; Kaigi offers the
-  default browser or a web app window
-- the menu timeline
-- event details submenu
-- per-event dismiss from the menu
 
 ## Privacy
 

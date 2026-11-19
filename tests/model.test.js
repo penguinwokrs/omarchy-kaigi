@@ -251,3 +251,59 @@ test("pending auto-join rows list shown Google calendars and iCal feeds", () => 
   ])
   assert.deepEqual(M.pendingAutoJoinRows([], []), [])
 })
+
+test("hooks run at start and end only when turned on", () => {
+  const e = ev(0, 30)
+  const base = { joinEventNotification: false, endOfEventNotification: false }
+  assert.deepEqual(M.dueActions([e], base, e.start, {}).map(d => d.kind), [])
+  const on = Object.assign({ eventHooks: true }, base)
+  assert.deepEqual(M.dueActions([e], on, e.start, {}).map(d => d.kind), ["hookStart"])
+  assert.deepEqual(M.dueActions([e], on, e.end, {}).map(d => d.kind), ["hookEnd"])
+  // Same exclusions as notifications.
+  assert.equal(M.dueActions([ev(0, 30, { participation: "declined" })], on, now, {}).length, 0)
+})
+
+test("snoozes come due once, and are dropped when the meeting is over or gone", () => {
+  const e = ev(0, 30)
+  const fired = {}
+  fired[M.snoozeKey(e.id)] = now + 5 * MIN
+  fired[M.snoozeKey("gone")] = now + 5 * MIN
+  let r = M.dueSnoozes([e], fired, now)
+  assert.deepEqual([r.due.length, r.stale], [0, [M.snoozeKey("gone")]])
+  r = M.dueSnoozes([e], fired, now + 5 * MIN)
+  assert.deepEqual(r.due.map(d => d.event), [e])
+  r = M.dueSnoozes([e], fired, e.end)
+  assert.deepEqual([r.due.length, r.stale.includes(M.snoozeKey(e.id))], [0, true])
+  // pruneFired keeps a snooze due in the future.
+  assert.ok(M.snoozeKey(e.id) in M.pruneFired(fired, now))
+})
+
+test("dismissing keeps ids of listed events and hides the event everywhere", () => {
+  const a = ev(10, 30), b = ev(60, 30)
+  const list = M.withDismissed(["old", a.id], b.id, [a, b])
+  assert.deepEqual(list, [a.id, b.id])
+  const cfg = { dismissedEvents: list, automaticEventJoin: true }
+  assert.equal(M.menuSections([a, b], cfg, now)[0].rows.length, 0)
+  assert.equal(M.dueActions([a], cfg, a.start, {}).length, 0)
+})
+
+test("new meeting URLs and bookmarks", () => {
+  assert.equal(M.createMeetingUrl("meet"), "https://meet.new")
+  assert.equal(M.createMeetingUrl("unknown"), "https://meet.new")
+  assert.match(M.createMeetingUrl("jitsi", () => 0), /^https:\/\/meet\.jit\.si\/Kaigi-a{12}$/)
+  for (const c of M.CREATE_MEETING) assert.ok(M.launchableUrl(M.createMeetingUrl(c.service)), c.service)
+  assert.deepEqual(M.parseBookmarks(["Daily standup https://meet.google.com/abc-defg-hij", "https://zoom.us/j/1",
+    "no url here", "x javascript:alert(1)", 42]), [
+    { name: "Daily standup", url: "https://meet.google.com/abc-defg-hij" },
+    { name: "zoom.us/j/1", url: "https://zoom.us/j/1" }
+  ])
+})
+
+test("attendee summary puts the organizer first and leaves you out", () => {
+  const e = ev(0, 30, { attendeeCount: 5, attendees: [
+    { name: "Ben", response: "accepted" }, { name: "Me", self: true, response: "pending" },
+    { name: "Ana", organizer: true, response: "accepted" }, { name: "Cy", response: "declined" }, { name: "Di" }] })
+  assert.equal(M.attendeeSummary(e, "Attendees (%1):", "+%1 more", 2), "Attendees (5): Ana, Ben, +2 more")
+  assert.equal(M.attendeeSummary(e, "Attendees (%1):", "+%1 more", 8), "Attendees (5): Ana, Ben, Cy, Di")
+  assert.equal(M.attendeeSummary(ev(0, 30), "A (%1):", "+%1", 8), "")
+})

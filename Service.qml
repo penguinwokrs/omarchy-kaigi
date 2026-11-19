@@ -262,7 +262,10 @@ Item {
     return new Date(ms).toLocaleTimeString(Qt.locale(Commons.I18n.formatLocale), "HH:mm")
   }
 
-  function notify(event, body) {
+  readonly property int snoozeSeconds: 300
+
+  // snoozable: add "Remind me in 5 minutes" (start notifications only).
+  function notify(event, body, snoozable) {
     // The headline renders as plain text; only the body is markup.
     var title = Model.shortenTitle(event.title, 120, strings.t("noTitle"))
     // A headline that looks like an option flag would be parsed as one.
@@ -272,31 +275,82 @@ Item {
     var plan = planFor(event)
     if (plan && Model.launchableUrl(plan.url))
       argv = argv.concat(["--action", strings.t("join")]).concat(launchArgv(plan, event.browserProfile))
+    if (snoozable && /^[0-9a-f]{1,64}$/.test(String(event.id)))
+      argv = argv.concat(["--action", strings.t("snooze").arg(root.snoozeSeconds / 60),
+                          "omarchy-shell", "-q", "kaigi", "snooze", String(event.id)])
     Util.execArgv(argv)
+  }
+
+  function snooze(eventId) {
+    var exists = root.events.some(function(e) { return e.id === eventId })
+    if (!exists || !root.firedLoaded) return false
+    var next = Model.pruneFired(root.fired, root.now)
+    next[Model.snoozeKey(eventId)] = Date.now() + root.snoozeSeconds * 1000
+    root.fired = next
+    saveFired()
+    return true
+  }
+
+  // omarchy-hook runs ~/.config/omarchy/hooks/<name> and <name>.d/* if they
+  // exist. Arguments: title, start and end (ISO 8601), meeting link, calendar.
+  function runHook(name, e) {
+    Util.execArgv(["omarchy-hook", name, String(e.title || ""), new Date(e.start).toISOString(),
+                   new Date(e.end).toISOString(), e.link ? String(e.link.url || "") : "", String(e.calendar || "")])
+  }
+
+  function dismissEvent(eventId) {
+    saveConfig({ dismissedEvents: Model.withDismissed(root.config.dismissedEvents, eventId, root.events) })
+  }
+
+  function restoreDismissed() { saveConfig({ dismissedEvents: [] }) }
+
+  // A link outside the calendar (a new meeting, a bookmark): browser or web
+  // app per openMeetingsIn, in the default Chrome profile.
+  function openUrl(url) {
+    if (!Model.launchableUrl(url)) return false
+    var webapp = root.config.openMeetingsIn === "webapp" && /^https?:\/\//.test(url)
+    Util.execArgv(launchArgv({ via: webapp ? "webapp" : "browser", url: url }, root.config.chromeProfile))
+    return true
+  }
+
+  function createMeeting(service) {
+    return openUrl(Model.createMeetingUrl(service || root.config.createMeetingService))
   }
 
   function perform(action) {
     var e = action.event
     var range = timeText(e.start) + " – " + timeText(e.end)
     if (action.kind === "eventStart") {
-      notify(e, (e.start > root.now ? strings.t("notify.startsSoon") : strings.t("notify.started")).arg(range))
+      notify(e, (e.start > root.now ? strings.t("notify.startsSoon") : strings.t("notify.started")).arg(range), true)
     } else if (action.kind === "eventEnd") {
-      notify(e, (e.end > root.now ? strings.t("notify.endsSoon") : strings.t("notify.ended")).arg(range))
+      notify(e, (e.end > root.now ? strings.t("notify.endsSoon") : strings.t("notify.ended")).arg(range), false)
     } else if (action.kind === "autoJoin") {
       join(e)
+    } else if (action.kind === "hookStart") {
+      runHook("kaigi-event-start", e)
+    } else if (action.kind === "hookEnd") {
+      runHook("kaigi-event-end", e)
     }
   }
 
   function runActions() {
     if (!root.firedLoaded || !root.loadedOnce) return
     var due = Model.dueActions(root.events, root.config, root.now, root.fired)
-    if (due.length === 0) return
+    var snoozes = Model.dueSnoozes(root.events, root.fired, root.now)
+    if (due.length === 0 && snoozes.due.length === 0 && snoozes.stale.length === 0) return
     var next = Model.pruneFired(root.fired, root.now)
     for (var i = 0; i < due.length; i++) next[due[i].identity] = root.now
+    for (var k = 0; k < snoozes.due.length; k++) delete next[snoozes.due[k].key]
+    for (var s = 0; s < snoozes.stale.length; s++) delete next[snoozes.stale[s]]
     // Claim first, act second.
     root.fired = next
     saveFired()
     for (var j = 0; j < due.length; j++) perform(due[j])
+    for (var m = 0; m < snoozes.due.length; m++) {
+      var e = snoozes.due[m].event
+      var range = timeText(e.start) + " – " + timeText(e.end)
+      notify(e, (e.start > root.now ? strings.t("notify.startsSoon") : strings.t("notify.started")).arg(range), true)
+    }
   }
 
   function saveFired() {
@@ -437,6 +491,9 @@ Item {
     function openSettings(): string { root.openSettings(""); return "ok" }
     function openSettingsPage(page: string): string { root.openSettings(page); return "ok" }
     function closeSettings(): string { settingsWindow.close(); return "ok" }
+    // From the start notification's "Remind me again" button.
+    function snooze(id: string): string { return root.snooze(id) ? "ok" : "unknown event" }
+    function createMeeting(service: string): string { return root.createMeeting(service) ? "ok" : "failed" }
     // omarchy-shell kaigi set <key> <json value>, e.g. set eventTimeFormat '"hide"'
     function set(key: string, valueJson: string): string {
       if (!/^[A-Za-z][A-Za-z0-9]{0,60}$/.test(key) || key === "calendars") return "invalid key"

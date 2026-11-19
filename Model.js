@@ -31,7 +31,10 @@ var DEFAULT_CONFIG = {
   openMeetingsIn: "browser",                  // browser (MeetingBar's default) | webapp
   providerOpeningModes: {},                   // { zoom: "zoomApp", teams: "teamsApp", ... }
   refreshMinutes: 5,
-  dismissedEvents: []
+  dismissedEvents: [],
+  eventHooks: false,                          // run omarchy-hook kaigi-event-start / kaigi-event-end
+  createMeetingService: "meet",               // meet | zoom | teams | jitsi
+  bookmarks: []                               // ["Name https://…", …]
 }
 
 function withDefaults(config) {
@@ -274,6 +277,92 @@ function pendingAutoJoinRows(accounts, feeds) {
   return rows
 }
 
+// ---- snooze -----------------------------------------------------------------
+//
+// "Remind me again" on a start notification stores snooze:<event id> = due
+// time in fired.json (pruneFired keeps future times), so it survives a shell
+// restart. dueSnoozes returns the ones due now; a snooze whose meeting has
+// ended, or that is no longer listed, is dropped.
+
+var SNOOZE_PREFIX = "snooze:"
+
+function snoozeKey(eventId) { return SNOOZE_PREFIX + String(eventId) }
+
+function dueSnoozes(events, fired, now) {
+  var due = [], stale = []
+  for (var key in fired || {}) {
+    if (key.indexOf(SNOOZE_PREFIX) !== 0) continue
+    var id = key.slice(SNOOZE_PREFIX.length)
+    var event = null
+    for (var i = 0; i < (events || []).length; i++) if (events[i].id === id) { event = events[i]; break }
+    if (!event || now >= event.end) { stale.push(key); continue }
+    if (now >= Number(fired[key])) due.push({ key: key, event: event })
+  }
+  return { due: due, stale: stale }
+}
+
+// ---- dismiss ----------------------------------------------------------------
+//
+// dismissedEvents holds event ids hidden from the menu, notifications and
+// auto-join. Ids of events no longer listed are dropped as new ones are added.
+function withDismissed(list, eventId, events) {
+  var listed = {}
+  for (var i = 0; i < (events || []).length; i++) listed[events[i].id] = true
+  var out = (list || []).filter(function(id) { return listed[id] && id !== eventId })
+  out.push(String(eventId))
+  return out.slice(-200)
+}
+
+// ---- event details ------------------------------------------------------------
+//
+// One line for the popup: "Attendees (12): Ana, Ben, … +4". label carries %1
+// for the count, more carries %1 for the names left out. The organizer comes
+// first; your own entry is left out.
+function attendeeSummary(event, label, more, max) {
+  var list = (event && event.attendees) || []
+  var count = Math.max(Number(event && event.attendeeCount) || 0, list.length)
+  if (count === 0) return ""
+  var people = list.filter(function(a) { return a && !a.self })
+  people.sort(function(a, b) { return (b.organizer ? 1 : 0) - (a.organizer ? 1 : 0) })
+  var shown = people.slice(0, max).map(function(a) { return String(a.name) })
+  var rest = count - shown.length - (list.some(function(a) { return a && a.self }) ? 1 : 0)
+  var text = String(label).replace("%1", String(count)) + " " + shown.join(", ")
+  if (rest > 0) text += (shown.length ? ", " : "") + String(more).replace("%1", String(rest))
+  return text
+}
+
+// ---- new meetings and bookmarks ---------------------------------------------
+
+var CREATE_MEETING = [
+  { service: "meet", name: "Google Meet", url: "https://meet.new" },
+  { service: "zoom", name: "Zoom", url: "https://zoom.us/start/videomeeting" },
+  { service: "teams", name: "Microsoft Teams", url: "https://teams.microsoft.com/l/meeting/new" },
+  { service: "jitsi", name: "Jitsi Meet", url: "https://meet.jit.si/" }
+]
+
+// random: a function returning [0, 1), for Jitsi's room name.
+function createMeetingUrl(service, random) {
+  var entry = CREATE_MEETING[0]
+  for (var i = 0; i < CREATE_MEETING.length; i++) if (CREATE_MEETING[i].service === service) entry = CREATE_MEETING[i]
+  if (entry.service !== "jitsi") return entry.url
+  var letters = "abcdefghijkmnpqrstuvwxyz23456789", room = "Kaigi-"
+  for (var j = 0; j < 12; j++) room += letters.charAt(Math.floor((random || Math.random)() * letters.length))
+  return entry.url + room
+}
+
+// Bookmarks are lines "Name https://…" (the URL is the last word) or a bare
+// URL; entries whose URL the launcher would refuse are skipped.
+function parseBookmarks(list) {
+  var out = []
+  for (var i = 0; i < (list || []).length && out.length < 20; i++) {
+    var line = typeof list[i] === "string" ? list[i].trim() : ""
+    var m = /^(.*?)\s*(\S+)$/.exec(line)
+    if (!m || !launchableUrl(m[2])) continue
+    out.push({ name: m[1] || m[2].replace(/^[a-z.-]+:\/\//, "").slice(0, 60), url: m[2] })
+  }
+  return out
+}
+
 function actionIdentity(event, kind, offsetSeconds) {
   var anchor = kind === "eventEnd" ? event.end : event.start
   return event.id + "|" + Math.floor(anchor / 1000) + "|" + kind + "|" + offsetSeconds
@@ -289,7 +378,9 @@ function dueActions(events, config, now, fired) {
   var plans = [
     { kind: "eventStart", enabled: !!config.joinEventNotification, offset: Number(config.joinEventNotificationTime) || 0, anchor: "start" },
     { kind: "eventEnd", enabled: !!config.endOfEventNotification, offset: Number(config.endOfEventNotificationTime) || 0, anchor: "end" },
-    { kind: "autoJoin", enabled: !!config.automaticEventJoin, offset: Number(config.automaticEventJoinTime) || 0, anchor: "start", needsLink: true }
+    { kind: "autoJoin", enabled: !!config.automaticEventJoin, offset: Number(config.automaticEventJoinTime) || 0, anchor: "start", needsLink: true },
+    { kind: "hookStart", enabled: config.eventHooks === true, offset: 0, anchor: "start" },
+    { kind: "hookEnd", enabled: config.eventHooks === true, offset: 0, anchor: "end" }
   ]
   for (var i = 0; i < (events || []).length; i++) {
     var e = events[i]
@@ -532,6 +623,13 @@ if (typeof module !== "undefined") {
     menuSections: menuSections,
     dueActions: dueActions,
     passesEventFilter: passesEventFilter,
+    snoozeKey: snoozeKey,
+    dueSnoozes: dueSnoozes,
+    withDismissed: withDismissed,
+    CREATE_MEETING: CREATE_MEETING,
+    createMeetingUrl: createMeetingUrl,
+    parseBookmarks: parseBookmarks,
+    attendeeSummary: attendeeSummary,
     pendingAutoJoinRows: pendingAutoJoinRows,
     actionIdentity: actionIdentity,
     pruneFired: pruneFired,

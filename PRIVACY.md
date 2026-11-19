@@ -40,7 +40,12 @@ Kaigi uses Google user data only for features you see on your own desktop:
   past meetings and striking through ones you declined
 - find the meeting link (for example Google Meet or Zoom) and open it when
   you click it, or at the start time if you turn on auto-join
+- show an event's location, description, and attendees when you open its
+  details in the popup
 - show desktop notifications on your computer when a meeting starts and ends
+- if you turn on hooks, run your own scripts on your computer when a meeting
+  starts and ends, passing them the event's title, start and end time, meeting
+  link, and calendar name
 - let you choose which calendars to show in the settings window
 - open meeting links in the Chrome profile signed in to the same Google
   account, by matching your email address against Chrome's profile list on
@@ -64,6 +69,10 @@ data brokers, and AI services.
   Calendar API endpoints.
 - When you open a meeting, Kaigi passes only that meeting's link to your
   browser or to the meeting app on your computer.
+- Hooks are off by default. If you turn them on, Kaigi passes the details
+  listed above to scripts you put in `~/.config/omarchy/hooks/` on your own
+  computer. Kaigi itself sends nothing anywhere; what your scripts do is up
+  to you.
 
 ## How the data is protected
 

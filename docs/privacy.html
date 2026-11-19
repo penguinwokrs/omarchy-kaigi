@@ -58,7 +58,9 @@
 <li>show your next meeting and a countdown in the bar</li>
 <li>list today's (and optionally tomorrow's) meetings in the popup, dimming past meetings and striking through ones you declined</li>
 <li>find the meeting link (for example Google Meet or Zoom) and open it when you click it, or at the start time if you turn on auto-join</li>
+<li>show an event's location, description, and attendees when you open its details in the popup</li>
 <li>show desktop notifications on your computer when a meeting starts and ends</li>
+<li>if you turn on hooks, run your own scripts on your computer when a meeting starts and ends, passing them the event's title, start and end time, meeting link, and calendar name</li>
 <li>let you choose which calendars to show in the settings window</li>
 <li>open meeting links in the Chrome profile signed in to the same Google account, by matching your email address against Chrome's profile list on your computer</li>
 </ul>
@@ -74,6 +76,7 @@
 <li>Calendar data goes directly from Google's API to your computer and stays there. The author never receives it.</li>
 <li>Kaigi has no analytics, no telemetry, and no third-party services. Its only network requests related to your Google account go to Google's OAuth and Calendar API endpoints.</li>
 <li>When you open a meeting, Kaigi passes only that meeting's link to your browser or to the meeting app on your computer.</li>
+<li>Hooks are off by default. If you turn them on, Kaigi passes the details listed above to scripts you put in <code>~/.config/omarchy/hooks/</code> on your own computer. Kaigi itself sends nothing anywhere; what your scripts do is up to you.</li>
 </ul>
 </div>
 </section>

@@ -622,6 +622,31 @@ def clip(text, limit):
     return text if len(text) <= limit else text[:limit]
 
 
+# Event details for the popup: plain-text notes and a short attendee list.
+MAX_NOTES = 1500
+MAX_ATTENDEES = 50
+
+
+def notes_text(description):
+    text = strip_html(description) if "<" in (description or "") else (description or "")
+    text = re.sub(r"[ \t]+\n", "\n", text.replace("\r\n", "\n").replace("\r", "\n"))
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return clip(text, MAX_NOTES)
+
+
+def attendee_list(people):
+    """people: iterable of (name, response, is_self, is_organizer)."""
+    out = []
+    for name, response, is_self, is_organizer in people:
+        name = " ".join(str(name or "").split())
+        if not name:
+            continue
+        out.append({"name": clip(name, 120), "response": response, "self": bool(is_self), "organizer": bool(is_organizer)})
+        if len(out) >= MAX_ATTENDEES:
+            break
+    return out
+
+
 # Whether invitations you have not answered yet are auto-joined. A calendar
 # entry's "pendingAutoJoin" turns it off: false for an iCal feed, or
 # {"<calendar id>": false} for the calendars of a Google account.
@@ -654,6 +679,15 @@ def event_base(props, emails, custom_patterns):
     conference = text("X-GOOGLE-CONFERENCE")
     status = (text("STATUS") or "CONFIRMED").upper()
     attendees = props.get("ATTENDEE", [])
+    org_params, org_value = first(props, "ORGANIZER")
+    org_addr = (org_value or "").strip()
+    org_addr = org_addr[7:] if org_addr.lower().startswith("mailto:") else org_addr
+    people = []
+    for params, value in attendees:
+        addr = value.strip()
+        addr = addr[7:] if addr.lower().startswith("mailto:") else addr
+        people.append((params.get("CN") or addr, PARTSTAT.get(params.get("PARTSTAT", "NEEDS-ACTION").upper(), "pending"),
+                       addr.lower() in emails, bool(org_addr) and addr.lower() == org_addr.lower()))
     participation = "accepted"
     if attendees:
         participation = "unknown"
@@ -680,6 +714,9 @@ def event_base(props, emails, custom_patterns):
         "status": "cancelled" if status == "CANCELLED" else ("tentative" if status == "TENTATIVE" else "confirmed"),
         "participation": participation,
         "hasAttendees": bool(attendees),
+        "attendeeCount": len(attendees),
+        "attendees": attendee_list(people),
+        "notes": notes_text(description),
         "link": link,
     }
 
@@ -876,7 +913,8 @@ def main(argv=None):
             })
             if snap:
                 helpers = {"find_link": find_link, "add_authuser": add_authuser, "strip_html": strip_html,
-                           "clip": clip, "to_ms": to_ms, "max_title": MAX_TITLE, "max_text": MAX_TEXT}
+                           "clip": clip, "to_ms": to_ms, "max_title": MAX_TITLE, "max_text": MAX_TEXT,
+                           "notes_text": notes_text, "attendee_list": attendee_list}
                 try:
                     events.extend(e for e in google.convert(snap, email, name, helpers, custom, filters, LOCAL)
                                   if e["end"] > to_ms(window_start) and e["start"] < to_ms(window_end))

@@ -109,6 +109,13 @@ Panel {
   }
 
 
+  // ---- details ----
+  property string expandedId: ""
+  function toggleDetails(id) { expandedId = expandedId === id ? "" : id }
+
+  // ---- bookmarks ----
+  readonly property var bookmarks: Model.parseBookmarks(config.bookmarks)
+
   // ---- keyboard cursor over joinable rows ----
   property int cursor: -1
   readonly property var sections: Model.menuSections(events, config, now)
@@ -134,6 +141,7 @@ Panel {
 
   onOpenedChanged: {
     cursor = -1
+    expandedId = ""
     if (opened && service) service.refresh(false)
   }
 
@@ -188,7 +196,13 @@ Panel {
       id: keys
       anchors.fill: parent
       implicitHeight: column.implicitHeight
-      onMoveRequested: function(dx, dy) { root.moveCursor(dy) }
+      // Left/right on a row closes/opens its details.
+      onMoveRequested: function(dx, dy) {
+        if (dx !== 0 && root.cursor >= 0 && root.cursor < root.flatRows.length) {
+          var id = root.flatRows[root.cursor].event.id
+          root.expandedId = dx > 0 ? id : (root.expandedId === id ? "" : root.expandedId)
+        } else root.moveCursor(dy)
+      }
       onActivateRequested: root.activateCursor()
       onReturnRequested: root.activateCursor()
       onCloseRequested: root.close()
@@ -339,17 +353,25 @@ Panel {
               Repeater {
                 model: section.modelData.rows
 
-                Rectangle {
-                  id: row
+                Column {
+                  id: entry
                   required property var modelData
                   readonly property var event: modelData.event
                   readonly property var look: modelData.look
+                  readonly property bool expanded: root.expandedId === event.id
+                  width: section.width
+                  spacing: Style.space(2)
+
+                Rectangle {
+                  id: row
+                  readonly property var event: entry.event
+                  readonly property var look: entry.look
                   readonly property int flatIndex: root.flatIds.indexOf(event.id)
                   readonly property bool hot: mouse.containsMouse || (root.cursor >= 0 && root.cursor === flatIndex)
                   width: section.width
                   height: Math.max(Style.spacing.popupRowHeight, rowContent.implicitHeight + Style.space(8))
                   radius: Style.cornerRadius
-                  color: hot && look.joinable ? Style.hoverFill : (look.ongoing ? Style.normalFill : "transparent")
+                  color: hot && look.joinable ? Style.hoverFill : (look.ongoing || entry.expanded ? Style.normalFill : "transparent")
                   opacity: look.inactive ? 0.5 : 1.0
 
                   Row {
@@ -378,10 +400,10 @@ Panel {
                     }
 
                     // Title, then "Not answered" for invitations without a
-                    // reply. The box keeps the join glyph at the right edge.
+                    // reply. The box keeps the glyphs at the right edge.
                     Item {
                       id: titleBox
-                      width: rowContent.width - timeLabel.width - joinGlyph.width - Style.space(3) - rowContent.spacing * 3
+                      width: rowContent.width - timeLabel.width - joinGlyph.width - detailsGlyph.width - Style.space(3) - rowContent.spacing * 4
                       height: titleText.implicitHeight
                       anchors.verticalCenter: parent.verticalCenter
 
@@ -415,26 +437,134 @@ Panel {
                       color: row.hot ? root.foreground : root.dim
                       text: row.look.joinable ? "󰕧" : ""
                     }
+
+                    // Show or hide the details below the row.
+                    PlainText {
+                      id: detailsGlyph
+                      width: Style.space(16)
+                      anchors.verticalCenter: parent.verticalCenter
+                      horizontalAlignment: Text.AlignHCenter
+                      color: detailsMouse.containsMouse || entry.expanded ? root.foreground : root.dim
+                      text: entry.expanded ? "󰅃" : "󰅀" // nf-md-chevron_up / chevron_down
+                    }
                   }
 
+                  // Click joins a meeting; on a row without a link it opens the details.
                   MouseArea {
                     id: mouse
                     anchors.fill: parent
                     hoverEnabled: true
-                    cursorShape: row.look.joinable ? Qt.PointingHandCursor : Qt.ArrowCursor
-                    onClicked: if (row.look.joinable) root.join(row.event)
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      if (row.look.joinable) root.join(row.event)
+                      else root.toggleDetails(row.event.id)
+                    }
+                  }
+
+                  MouseArea {
+                    id: detailsMouse
+                    z: 1
+                    width: detailsGlyph.width + Style.space(12)
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.right: parent.right
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.toggleDetails(row.event.id)
                   }
 
                   PanelToolTip {
-                    visible: mouse.containsMouse && row.look.joinable
+                    visible: mouse.containsMouse && !detailsMouse.containsMouse && row.look.joinable
                     text: strings.t("joinVia").arg(String(row.event.link ? row.event.link.serviceName : ""))
                   }
+                }
+
+                // ---- details ----
+                Column {
+                  visible: entry.expanded
+                  width: section.width
+                  leftPadding: Style.space(21)
+                  rightPadding: Style.space(8)
+                  bottomPadding: Style.space(6)
+                  spacing: Style.space(4)
+                  readonly property real textWidth: width - leftPadding - rightPadding
+
+                  PlainText {
+                    width: parent.textWidth
+                    visible: text !== ""
+                    wrapMode: Text.Wrap
+                    elide: Text.ElideNone
+                    font.pixelSize: Style.font.bodySmall
+                    text: entry.expanded && entry.event.location ? "󰍎 " + String(entry.event.location).slice(0, 300) : ""
+                  }
+                  PlainText {
+                    width: parent.textWidth
+                    visible: text !== ""
+                    wrapMode: Text.Wrap
+                    elide: Text.ElideNone
+                    font.pixelSize: Style.font.bodySmall
+                    color: root.dim
+                    text: entry.expanded ? Model.attendeeSummary(entry.event, strings.t("details.attendees"), strings.t("details.more"), 8) : ""
+                  }
+                  PlainText {
+                    width: parent.textWidth
+                    visible: text !== ""
+                    wrapMode: Text.Wrap
+                    elide: Text.ElideRight
+                    maximumLineCount: 12
+                    font.pixelSize: Style.font.bodySmall
+                    text: entry.expanded ? String(entry.event.notes || "") : ""
+                  }
+                  PlainText {
+                    width: parent.textWidth
+                    visible: entry.expanded && !entry.event.location && !entry.event.notes && !(entry.event.attendees || []).length
+                    font.pixelSize: Style.font.bodySmall
+                    color: root.dim
+                    text: strings.t("details.none")
+                  }
+                  Button {
+                    iconText: "󰈉" // nf-md-eye_off
+                    text: strings.t("details.dismiss")
+                    foreground: root.foreground
+                    fontFamily: root.fontFamily
+                    enabled: !!root.service
+                    onClicked: { root.expandedId = ""; root.service.dismissEvent(entry.event.id) }
+                  }
+                }
                 }
               }
             }
           }
 
           PanelSeparator { width: parent.width; foreground: root.foreground }
+
+          // ---- bookmarks ----
+          Column {
+            width: parent.width
+            spacing: Style.space(2)
+            visible: root.bookmarks.length > 0
+
+            PanelSectionHeader {
+              width: parent.width
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              text: strings.t("bookmarks")
+            }
+            Repeater {
+              model: root.bookmarks
+              Button {
+                required property var modelData
+                width: column.width
+                leftAlign: true
+                iconText: "󰃀" // nf-md-bookmark
+                text: modelData.name
+                foreground: root.foreground
+                fontFamily: root.fontFamily
+                enabled: !!root.service
+                onClicked: { if (root.service.openUrl(modelData.url)) root.close() }
+              }
+            }
+          }
 
           // ---- Google accounts ----
           Column {
@@ -490,6 +620,14 @@ Panel {
 
           Row {
             spacing: Style.space(6)
+            Button {
+              iconText: "󰐕" // nf-md-plus
+              text: strings.t("newMeeting")
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              enabled: !!root.service
+              onClicked: { if (root.service.createMeeting("")) root.close() }
+            }
             Button {
               iconText: "󰑐" // nf-md-refresh
               text: strings.t("refresh")

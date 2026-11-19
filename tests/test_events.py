@@ -155,6 +155,21 @@ class AttendeeTests(unittest.TestCase):
         self.assertEqual(got, {"declined": ("declined", True), "tentative": ("tentative", True),
                                "pending": ("pending", True), "personal": ("accepted", False)})
 
+    def test_details_for_the_popup(self):
+        base = dict(DTSTART="20261116T010000Z", DTEND="20261116T020000Z")
+        text = cal(vevent(UID="1", SUMMARY="Review", DESCRIPTION="Agenda\\nItem",
+                          ATTENDEE__CN_Ana__PARTSTAT_ACCEPTED="mailto:ana@example.com",
+                          ATTENDEE__PARTSTAT_NEEDS_ACTION="mailto:me@example.com",
+                          ORGANIZER__CN_Ana="mailto:ana@example.com", **base))
+        text = (text.replace("PARTSTAT-ACCEPTED", "PARTSTAT=ACCEPTED")
+                .replace("PARTSTAT-NEEDS-ACTION", "PARTSTAT=NEEDS-ACTION").replace("CN-Ana", "CN=Ana"))
+        [e] = run(text, dt.datetime(2026, 11, 16, tzinfo=TOKYO))
+        self.assertEqual(e["notes"], "Agenda\nItem")
+        self.assertEqual(e["attendeeCount"], 2)
+        self.assertEqual(e["attendees"], [
+            {"name": "Ana", "response": "accepted", "self": False, "organizer": True},
+            {"name": "me@example.com", "response": "pending", "self": True, "organizer": False}])
+
     def test_feed_email_from_google_url(self):
         url = "https://calendar.google.com/calendar/ical/me%40example.com/private-abc/basic.ics"
         self.assertEqual(me.feed_email(url), "me@example.com")

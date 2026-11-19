@@ -609,6 +609,11 @@ def convert(snapshot, account_email, cal_name, helpers, custom, filters, local):
                 "status": "cancelled" if status == "cancelled" else ("tentative" if status == "tentative" else "confirmed"),
                 "participation": participation,
                 "hasAttendees": bool(attendees),
+                "attendeeCount": len(attendees),
+                "attendees": helpers["attendee_list"](
+                    (a.get("displayName") or a.get("email"), RESPONSE.get(a.get("responseStatus"), "pending"),
+                     a.get("self"), a.get("organizer")) for a in attendees) if "attendee_list" in helpers else [],
+                "notes": helpers["notes_text"](description) if "notes_text" in helpers else "",
                 "link": link,
                 "start": to_ms(start),
                 "end": to_ms(end),
