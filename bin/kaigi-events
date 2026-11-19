@@ -927,7 +927,8 @@ def main(argv=None):
             profile = resolved or global_profile
             result["accounts"].append({
                 "configIndex": config_index, "account": account, "email": email,
-                "calendarIds": [str(x) for x in (cal.get("calendarIds") or [])][:100],
+                "calendarIds": google.selection(cal)[1],
+                "calendarIdsChosen": google.selection(cal)[0],
                 "chromeProfile": stored, "resolvedProfile": profile,
                 "profileSource": source, "profileStale": stale,
                 "pendingAutoJoin": pending_auto_join_map(cal),

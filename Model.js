@@ -251,7 +251,10 @@ function pendingAutoJoinRows(accounts, feeds) {
   accounts = accounts || []
   for (var a = 0; a < accounts.length; a++) {
     var acct = accounts[a] || {}
-    var chosen = acct.calendarIds && acct.calendarIds.length ? acct.calendarIds : (acct.activeIds || [])
+    // calendarIdsChosen: an empty choice made in Settings means none, not
+    // Google's default selection.
+    var chosen = acct.calendarIdsChosen === true || (acct.calendarIds && acct.calendarIds.length)
+      ? (acct.calendarIds || []) : (acct.activeIds || [])
     var map = acct.pendingAutoJoin && typeof acct.pendingAutoJoin === "object" ? acct.pendingAutoJoin : {}
     var cals = acct.calendars || []
     for (var c = 0; c < cals.length; c++) {

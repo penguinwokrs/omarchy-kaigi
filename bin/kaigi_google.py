@@ -565,11 +565,8 @@ def download(account, cal_cfg, window_start, window_end, http_client, secrets_st
         page = doc.get("nextPageToken")
         if not page:
             break
-    wanted = [str(x) for x in (cal_cfg.get("calendarIds") or [])]
-    if wanted:
-        chosen = [e for e in entries if e.get("id") in wanted or (e.get("primary") and "primary" in wanted)]
-    else:
-        chosen = [e for e in entries if e.get("selected") or e.get("primary")]
+    ids = chosen_ids(entries, cal_cfg)
+    chosen = [e for e in entries if str(e.get("id", "")) in ids]
     out = {"fetchedAt": int(time.time()), "windowStart": rfc3339(window_start), "windowEnd": rfc3339(window_end),
            "calendars": [], "events": {},
            # Every calendar of the account, for the settings window's picker.
@@ -597,6 +594,53 @@ def download(account, cal_cfg, window_start, window_end, http_client, secrets_st
     return out
 
 
+def selection(cal_cfg):
+    """(explicit, ids). calendarIdsChosen marks a selection made in the
+    settings window: then calendarIds is used as it is, and an empty list
+    means no calendars. Without it (what sign-in writes), an empty list means
+    the calendars shown in Google Calendar, plus the primary one."""
+    raw = cal_cfg.get("calendarIds") if isinstance(cal_cfg, dict) else None
+    ids = [str(x) for x in raw][:100] if isinstance(raw, list) else []
+    explicit = bool(ids) or (isinstance(cal_cfg, dict) and cal_cfg.get("calendarIdsChosen") is True)
+    return explicit, ids
+
+
+def selection_key(cal_cfg):
+    explicit, ids = selection(cal_cfg)
+    return json.dumps({"explicit": explicit, "ids": ids})
+
+
+def chosen_ids(entries, cal_cfg):
+    """Ids of the calendars to read, from calendarList entries (selected) or
+    a snapshot's allCalendars (googleSelected)."""
+    explicit, wanted = selection(cal_cfg)
+    out = []
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        cid = str(e.get("id", ""))
+        if explicit:
+            take = cid in wanted or (e.get("primary") and "primary" in wanted)
+        else:
+            take = e.get("selected") or e.get("googleSelected") or e.get("primary")
+        if cid and take:
+            out.append(cid)
+    return out
+
+
+def restrict(snapshot, cal_cfg):
+    """A stale snapshot cut down to the calendars selected now, so a calendar
+    the user turned off never comes back from the cache after a failed fetch."""
+    keep = set(chosen_ids(snapshot.get("allCalendars") or [], cal_cfg))
+    out = dict(snapshot)
+    out["calendars"] = [c for c in snapshot.get("calendars") or []
+                        if isinstance(c, dict) and str(c.get("id", "")) in keep]
+    events = snapshot.get("events") if isinstance(snapshot.get("events"), dict) else {}
+    out["events"] = {cid: items for cid, items in events.items() if cid in keep}
+    out["selectionKey"] = selection_key(cal_cfg)
+    return out
+
+
 def cache_name(account):
     return "google-" + hashlib.sha256(account.encode()).hexdigest()[:16] + ".json"
 
@@ -610,20 +654,27 @@ def load(account, cal_cfg, window_start, window_end, max_age, force,
     cached = read_json(path, None)
     covers = (isinstance(cached, dict) and cached.get("windowStart") == rfc3339(window_start)
               and cached.get("windowEnd") == rfc3339(window_end)
-              and json.dumps(cached.get("calendarIds", [])) == json.dumps(cal_cfg.get("calendarIds") or []))
+              and cached.get("selectionKey") == selection_key(cal_cfg))
     if covers and not force and time.time() - cached.get("fetchedAt", 0) < max_age:
         return cached, None
     try:
         snap = download(account, cal_cfg, window_start, window_end, http_client, secrets_store, client_path)
-        snap["calendarIds"] = cal_cfg.get("calendarIds") or []
+        snap["calendarIds"] = selection(cal_cfg)[1]
+        snap["selectionKey"] = selection_key(cal_cfg)
         write_private(path, json.dumps(snap, ensure_ascii=False))
         return snap, None
     except GoogleError as exc:
-        stale = cached if isinstance(cached, dict) else None
-        return stale, exc
+        return stale_for(cached, cal_cfg), exc
     except (OSError, ValueError) as exc:
-        stale = cached if isinstance(cached, dict) else None
-        return stale, GoogleError(f"network error ({type(exc).__name__})")
+        return stale_for(cached, cal_cfg), GoogleError(f"network error ({type(exc).__name__})")
+
+
+def stale_for(cached, cal_cfg):
+    if not isinstance(cached, dict):
+        return None
+    if cached.get("selectionKey") == selection_key(cal_cfg):
+        return cached
+    return restrict(cached, cal_cfg)
 
 
 # --------------------------------------------------------------------------

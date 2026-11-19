@@ -136,7 +136,15 @@ Item {
     writeConfig(next)
   }
 
-  function setCalendarIds(index, ids) { updateCalendar(index, "calendarIds", ids.slice(0, 100)) }
+  // calendarIdsChosen: the list is the user's own choice, so an empty one
+  // means no calendars rather than Google's default selection.
+  function setCalendarIds(index, ids) {
+    var next = cloneConfig()
+    if (!Array.isArray(next.calendars) || !next.calendars[index]) return
+    next.calendars[index].calendarIds = ids.slice(0, 100)
+    next.calendars[index].calendarIdsChosen = true
+    writeConfig(next)
+  }
   function setCalendarProfile(index, dir) { updateCalendar(index, "chromeProfile", String(dir || "")) }
 
   // Auto-join for invitations not answered yet. calendarId is a Google

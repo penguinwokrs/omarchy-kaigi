@@ -517,7 +517,8 @@ Item {
         Column {
           id: acct
           required property var modelData
-          readonly property var effective: modelData.calendarIds && modelData.calendarIds.length ? modelData.calendarIds : modelData.activeIds
+          readonly property var effective: modelData.calendarIdsChosen === true || (modelData.calendarIds && modelData.calendarIds.length)
+                                           ? (modelData.calendarIds || []) : modelData.activeIds
           width: root.rowWidth
           spacing: Style.space(4)
 

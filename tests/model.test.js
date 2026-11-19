@@ -250,6 +250,9 @@ test("pending auto-join rows list shown Google calendars and iCal feeds", () => 
     [1, "", "Holidays", "", false]
   ])
   assert.deepEqual(M.pendingAutoJoinRows([], []), [])
+  // Every calendar turned off in Settings: no rows, not Google's selection.
+  const none = [Object.assign({}, accounts[0], { calendarIdsChosen: true })]
+  assert.deepEqual(M.pendingAutoJoinRows(none, []), [])
 })
 
 test("hooks run at start and end only when turned on", () => {

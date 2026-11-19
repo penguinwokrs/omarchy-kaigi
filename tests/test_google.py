@@ -359,6 +359,42 @@ class FetchTests(unittest.TestCase):
         snap, _ = self.load(FakeGoogle(), cal={"calendarIds": ["hidden@group.calendar.google.com"]})
         self.assertEqual([c["id"] for c in snap["calendars"]], ["hidden@group.calendar.google.com"])
 
+    def test_turning_off_every_calendar_reads_none(self):
+        fake = FakeGoogle()
+        snap, err = self.load(fake, cal={"calendarIds": [], "calendarIdsChosen": True})
+        self.assertIsNone(err)
+        self.assertEqual(snap["calendars"], [])
+        self.assertEqual(snap["events"], {})
+        self.assertFalse([u for m, u, d in fake.calls if "/events?" in u])
+        # The picker still lists every calendar to turn back on.
+        self.assertEqual(len(snap["allCalendars"]), 3)
+        # Without the marker (what sign-in writes), empty still means Google's selection.
+        snap, _ = self.load(FakeGoogle(), force=True, cal={"calendarIds": []})
+        self.assertEqual([c["id"] for c in snap["calendars"]], ["me@example.com", "team@group.calendar.google.com"])
+
+    def test_a_changed_selection_is_not_served_from_cache(self):
+        self.load(FakeGoogle(), cal={"calendarIds": []})
+        fake = FakeGoogle()
+        self.load(fake, cal={"calendarIds": [], "calendarIdsChosen": True})
+        self.assertTrue(fake.calls)
+
+    def test_failed_fetch_after_narrowing_keeps_only_the_calendars_still_selected(self):
+        items = [{"id": "m", "_cal": "me@example.com", "summary": "m",
+                  "start": {"dateTime": "2026-11-16T10:00:00+09:00"}, "end": {"dateTime": "2026-11-16T11:00:00+09:00"}},
+                 {"id": "t", "_cal": "team@group.calendar.google.com", "summary": "t",
+                  "start": {"dateTime": "2026-11-16T12:00:00+09:00"}, "end": {"dateTime": "2026-11-16T13:00:00+09:00"}}]
+        self.load(FakeGoogle(items=items), cal={"calendarIds": []})
+        broken = FakeGoogle(refresh_ok=False)
+        snap, err = self.load(broken, cal={"calendarIds": ["me@example.com"], "calendarIdsChosen": True})
+        self.assertIsInstance(err, g.AuthRequired)
+        self.assertEqual([c["id"] for c in snap["calendars"]], ["me@example.com"])
+        self.assertEqual(list(snap["events"]), ["me@example.com"])
+        snap, _ = self.load(broken, cal={"calendarIds": [], "calendarIdsChosen": True})
+        self.assertEqual((snap["calendars"], snap["events"]), ([], {}))
+        # Back to Google's selection: both, from the cached calendar list.
+        snap, _ = self.load(broken, cal={"calendarIds": []})
+        self.assertEqual(sorted(snap["events"]), ["me@example.com", "team@group.calendar.google.com"])
+
     def test_expired_grant_reports_auth_required_and_keeps_cache(self):
         self.load(FakeGoogle())
         snap, err = self.load(FakeGoogle(refresh_ok=False), force=True)
