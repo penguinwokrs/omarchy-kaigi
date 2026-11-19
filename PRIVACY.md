@@ -1,10 +1,12 @@
 # Kaigi Privacy Policy
 
+_Last updated: November 19, 2026_
+
 Kaigi is an open-source plugin for the Omarchy desktop. It runs entirely on
 your own computer. It has no server, and the author operates no service that
 receives your data.
 
-## What Kaigi accesses
+## Google user data Kaigi accesses
 
 When you sign in with Google, Kaigi asks for two read-only permissions:
 
@@ -13,44 +15,105 @@ When you sign in with Google, Kaigi asks for two read-only permissions:
 - **See the list of Google calendars you're subscribed to**
   (`https://www.googleapis.com/auth/calendar.calendarlist.readonly`)
 
-It uses them to:
+With them, Kaigi reads:
 
-- list your calendars, so it knows which ones are shown (selected) in Google
-  Calendar
-- read events from now through tomorrow: title, time, location, description,
-  conference link, and your own RSVP status
+- **Your calendar list:** each calendar's ID, name, and color, and whether it
+  is your primary calendar and whether it is shown (selected) in Google
+  Calendar.
+- **Your email address,** which is the ID of your primary calendar. Kaigi
+  uses it to label the signed-in account.
+- **Events on the calendars you show,** from the start of today through the
+  end of tomorrow. Kaigi stores these events as the Google Calendar API
+  returns them: title, start and end time, location, description, conference
+  details, status, organizer, and attendees with their responses (including
+  your own).
 
 Kaigi never creates, changes, or deletes anything in your Google account.
+It does not create aggregated or anonymized data from your Google data.
 
-## Where your data goes
+## How Kaigi uses that data
 
-- **Calendar data** goes directly from Google's API to your computer. Kaigi
-  keeps a short-lived cache in `~/.cache/kaigi/`, readable only by your user,
-  to show the next meeting in the bar.
+Kaigi uses Google user data only for features you see on your own desktop:
+
+- show your next meeting and a countdown in the bar
+- list today's (and optionally tomorrow's) meetings in the popup, dimming
+  past meetings and striking through ones you declined
+- find the meeting link (for example Google Meet or Zoom) and open it when
+  you click it, or at the start time if you turn on auto-join
+- show desktop notifications on your computer when a meeting starts and ends
+- let you choose which calendars to show in the settings window
+- open meeting links in the Chrome profile signed in to the same Google
+  account, by matching your email address against Chrome's profile list on
+  your computer
+
+Kaigi does not use Google user data for advertising, profiling, analytics,
+credit or lending decisions, or any purpose other than these features. Kaigi
+does not use AI or machine-learning models, and it does not use Google user
+data to develop, improve, or train any AI or machine-learning model.
+
+## Sharing and transfer
+
+**Kaigi does not share, transfer, or sell Google user data, raw or
+aggregated/anonymized, to anyone.** That includes the author, advertisers,
+data brokers, and AI services.
+
+- Calendar data goes directly from Google's API to your computer and stays
+  there. The author never receives it.
+- Kaigi has no analytics, no telemetry, and no third-party services. Its only
+  network requests related to your Google account go to Google's OAuth and
+  Calendar API endpoints.
+- When you open a meeting, Kaigi passes only that meeting's link to your
+  browser or to the meeting app on your computer.
+
+## How the data is protected
+
+- All requests to Google use HTTPS.
+- Sign-in uses Google's OAuth 2.0 for installed apps with PKCE and a random
+  `state` value. The sign-in response is received only on your own computer
+  (`127.0.0.1`).
 - **The sign-in token** (OAuth refresh token) is stored in your desktop
   keyring (GNOME Keyring through the Secret Service API). Only if no keyring
-  is available does it fall back to a file readable only by your user under
-  `~/.local/state/kaigi/`.
-- **Nothing is sent anywhere else.** Kaigi has no analytics, no telemetry,
-  and no third-party services. The only network requests it makes go to
-  Google's OAuth and Calendar endpoints. Opening a meeting link hands that
-  link to your own browser.
+  is available does it fall back to a file under `~/.local/state/kaigi/` that
+  only your user can read.
+- Short-lived access tokens are kept in memory and never written to disk.
+- Kaigi's cache (`~/.cache/kaigi/`) and state (`~/.local/state/kaigi/`) files
+  are created so that only your user account can read them (mode 0600).
+- Kaigi asks only for read-only permissions, and its source code is public
+  so anyone can check what it does.
 
-## Removing your data
+## Retention and deletion
 
+- **Calendar cache:** the events and calendar list described above are kept
+  in `~/.cache/kaigi/` so the bar can update without contacting Google every
+  minute. The cache covers only today and tomorrow, and Kaigi replaces it on
+  every refresh (every 5 minutes by default). It stays on your computer until
+  you sign out or delete it.
+- **Account details:** your email address and the refresh token are kept
+  until you sign out.
 - **Sign out:** the "Sign out" button in Kaigi, or `bin/kaigi-google logout`,
-  revokes the token with Google, deletes it from the keyring, and removes the
-  cache.
-- **Revoke access from Google's side:** you can also revoke Kaigi's access at
-  any time at <https://myaccount.google.com/permissions>.
+  revokes the token with Google, deletes it from the keyring, removes the
+  account from Kaigi's settings, and deletes that account's calendar cache.
+- **Revoke access from Google's side:** you can revoke Kaigi's access at any
+  time at <https://myaccount.google.com/permissions>. Kaigi then can no longer
+  read your calendar. To also remove data already cached on your computer,
+  sign out in Kaigi or delete the folders below.
 - **Uninstall:** deleting `~/.config/kaigi`, `~/.local/state/kaigi`, and
   `~/.cache/kaigi` removes everything Kaigi stored.
 
+Because the author never receives your data, there is nothing stored
+elsewhere to delete.
+
 ## Use of Google user data
 
-Kaigi's use of information received from Google APIs adheres to the
-[Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
+Kaigi's use and transfer of information received from Google APIs adheres to
+the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
 including the Limited Use requirements.
+
+## Changes to this policy
+
+Changes are published on this page, with the date at the top updated. The
+history of every change is in the
+[source repository](https://github.com/penguinwokrs/omarchy-kaigi/commits/main/PRIVACY.md).
 
 ## Contact
 
