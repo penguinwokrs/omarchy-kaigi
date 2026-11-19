@@ -566,58 +566,6 @@ Panel {
             }
           }
 
-          // ---- Google accounts ----
-          Column {
-            width: parent.width
-            spacing: Style.space(2)
-            visible: !!root.service && root.service.googleClient && root.service.googleAccounts.length > 0
-
-            PanelSectionHeader {
-              width: parent.width
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              text: strings.t("google.accounts")
-            }
-            Repeater {
-              model: root.service ? root.service.googleAccounts : []
-              Item {
-                id: accountRow
-                required property var modelData
-                width: column.width
-                height: Math.max(signOutButton.implicitHeight, accountText.implicitHeight)
-                PlainText {
-                  id: accountText
-                  anchors.left: parent.left
-                  anchors.leftMargin: Style.space(8)
-                  anchors.right: signOutButton.left
-                  anchors.verticalCenter: parent.verticalCenter
-                  color: root.service && root.service.googleAuthRequiredAccounts.indexOf(accountRow.modelData.account) !== -1
-                    ? (root.bar ? root.bar.urgent : Commons.Color.urgent) : root.foreground
-                  text: String(accountRow.modelData.email || accountRow.modelData.account)
-                }
-                Button {
-                  id: signOutButton
-                  anchors.right: parent.right
-                  anchors.verticalCenter: parent.verticalCenter
-                  enabled: !!root.service
-                  iconText: "󰍃" // nf-md-logout
-                  text: strings.t("google.signOut")
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
-                  onClicked: root.service.googleLogout(accountRow.modelData.account)
-                }
-              }
-            }
-            Button {
-              enabled: !!root.service
-              iconText: "󰐕" // nf-md-plus
-              text: strings.t("google.addAccount")
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-              onClicked: root.service.googleLogin("auto")
-            }
-          }
-
           Row {
             spacing: Style.space(6)
             Button {

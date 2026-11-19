@@ -102,8 +102,9 @@ When sign-in succeeds, Kaigi adds a Google entry to `config.json` and reads
 the calendars that are checked (selected) in Google Calendar. Pick other
 calendars on the settings window's Calendars tab.
 
-You can add more accounts with **アカウントを追加 / Add account** in the popup
-or the settings window. Each account is keyed by its address. If a Chrome
+The popup offers **Googleでログイン / Sign in with Google** until the first
+account is signed in. Add more accounts with **アカウントを追加 / Add account**
+on the settings window's Calendars tab. Each account is keyed by its address. If a Chrome
 profile is signed in with that address, Kaigi uses it to open that account's
 meetings.
 
@@ -124,7 +125,7 @@ meetings.
   `hangoutLink` first, then the location and the description. Your RSVP comes
   from your own entry in `attendees` (`self: true`). Working-location entries
   are skipped.
-- **Sign-out:** `ログアウト / Sign out` in the popup or the settings window,
+- **Sign-out:** `ログアウト / Sign out` on the settings window's Calendars tab,
   or `bin/kaigi-google logout --account <name>`, revokes the token, removes it from the keyring
   and deletes the cache.
 - **Expired sign-in:** if Google rejects the sign-in (revoked, or 7 days in

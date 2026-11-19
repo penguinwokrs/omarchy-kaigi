@@ -31,7 +31,6 @@
   "google.signIn": "Sign in with Google",
   "google.signOut": "Sign out",
   "google.waiting": "Finish signing in in your browser…",
-  "google.accounts": "Google accounts",
   "google.addAccount": "Add account",
   "google.signInAgainFor": "Sign in again: %1",
   "settings.title": "Kaigi Settings",
