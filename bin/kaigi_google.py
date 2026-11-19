@@ -216,16 +216,23 @@ class Secrets:
             return None
 
     def clear(self, account):
+        """Removes the token from the keyring and the fallback file. True only
+        when both are confirmed gone (secret-tool exited 0, the file is absent)."""
+        ok = True
         if self.tool:
             try:
-                subprocess.run([self.tool, "clear", "service", SECRET_SERVICE, "account", account],
-                               capture_output=True, timeout=20)
+                r = subprocess.run([self.tool, "clear", "service", SECRET_SERVICE, "account", account],
+                                   capture_output=True, timeout=20)
+                ok = r.returncode == 0
             except (OSError, subprocess.SubprocessError):
-                pass
+                ok = False
         try:
             os.remove(self._file(account))
-        except OSError:
+        except FileNotFoundError:
             pass
+        except OSError:
+            ok = False
+        return ok
 
 
 def b64url(data):
@@ -452,17 +459,40 @@ def ensure_config_entry(account, config_path=CONFIG_PATH):
         write_private(config_path, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
 
 
+def revoke(http_client, token):
+    """True when Google confirms the token no longer works: revoked now, or
+    already invalid (HTTP 400 invalid_token)."""
+    try:
+        status, payload = http_client.request("POST", REVOKE_URL, {"token": token})
+    except Exception:
+        return False
+    return status == 200 or (status == 400 and isinstance(payload, dict) and payload.get("error") == "invalid_token")
+
+
+class SignOutIncomplete(GoogleError):
+    code = "sign_out_incomplete"
+
+
+class RevokeUnconfirmed(GoogleError):
+    code = "revoke_unconfirmed"
+
+
 def logout(account="default", http_client=None, secrets_store=None, accounts_path=ACCOUNTS_PATH, config_path=CONFIG_PATH,
            cache_dir=CACHE_DIR):
+    """Revokes the refresh token, removes it from this computer, then forgets
+    the account. If Google does not confirm the revocation and the token cannot
+    be removed either, nothing else changes (the account stays, so sign-out can
+    be retried) and SignOutIncomplete is raised. If only the revocation is
+    unconfirmed, the account is removed and RevokeUnconfirmed is raised so the
+    user can remove access on Google's side."""
     http_client = http_client or Http()
     secrets_store = secrets_store or Secrets()
     token = secrets_store.lookup(account)
-    if token:
-        try:
-            http_client.request("POST", REVOKE_URL, {"token": token})
-        except Exception:
-            pass
-    secrets_store.clear(account)
+    revoked = revoke(http_client, token) if token else True
+    cleared = secrets_store.clear(account) is not False and not secrets_store.lookup(account)
+    if not revoked and not cleared:
+        raise SignOutIncomplete("Sign-out failed: Google did not confirm the revocation and the token could not be "
+                                "removed from the keyring. The account was kept; try again.")
     accounts = read_json(accounts_path, {})
     accounts.pop(account, None)
     write_private(accounts_path, json.dumps(accounts, indent=2) + "\n")
@@ -475,6 +505,9 @@ def logout(account="default", http_client=None, secrets_store=None, accounts_pat
         os.remove(os.path.join(cache_dir, cache_name(account)))
     except OSError:
         pass
+    if not revoked:
+        raise RevokeUnconfirmed("Signed out on this computer, but Google did not confirm the revocation. "
+                                "Remove Kaigi at https://myaccount.google.com/permissions to be sure.")
 
 
 def status(client_path=CLIENT_PATH, accounts_path=ACCOUNTS_PATH):

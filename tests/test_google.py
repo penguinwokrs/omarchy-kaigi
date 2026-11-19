@@ -27,8 +27,9 @@ CLIENT = {"installed": {"client_id": "123-abc.apps.googleusercontent.com", "clie
 
 
 class FakeSecrets:
-    def __init__(self):
+    def __init__(self, clear_ok=True):
         self.data = {}
+        self.clear_ok = clear_ok
 
     def store(self, account, token):
         self.data[account] = token
@@ -38,14 +39,18 @@ class FakeSecrets:
         return self.data.get(account)
 
     def clear(self, account):
+        if not self.clear_ok:
+            return False
         self.data.pop(account, None)
+        return True
 
 
 class FakeGoogle:
     """Answers the token endpoint and the two Calendar API calls Kaigi makes."""
 
-    def __init__(self, items=None, refresh_ok=True):
+    def __init__(self, items=None, refresh_ok=True, revoke=(200, {})):
         self.calls = []
+        self.revoke = revoke
         self.items = items or []
         self.refresh_ok = refresh_ok
         self.verifier = None
@@ -62,7 +67,9 @@ class FakeGoogle:
             assert data["refresh_token"] == "rt1"
             return 200, {"access_token": "at2", "expires_in": 3599}
         if url == g.REVOKE_URL:
-            return 200, {}
+            if self.revoke is None:
+                raise OSError("network down")
+            return self.revoke
         assert headers and headers["Authorization"].startswith("Bearer ")
         if url.endswith("/users/me/calendarList/primary"):
             return 200, {"id": "me@example.com", "primary": True}
@@ -211,6 +218,59 @@ class LoginTests(unittest.TestCase):
         self.assertNotIn("default", secrets.data)
         self.assertEqual([c.get("type") for c in g.read_json(self.config, {})["calendars"]], [None])
         self.assertIn((("POST", g.REVOKE_URL, {"token": "rt1"})), fake.calls)
+
+    def logout_with(self, fake, secrets):
+        g.logout("default", http_client=fake, secrets_store=secrets, accounts_path=self.accounts,
+                 config_path=self.config, cache_dir=self.tmp.name)
+
+    def signed_in(self, secrets):
+        self.login(FakeGoogle(), secrets, self.browser()[0])
+        cache = os.path.join(self.tmp.name, g.cache_name("default"))
+        with open(cache, "w") as fh:
+            fh.write("{}")
+        return cache
+
+    def test_logout_keeps_the_account_when_nothing_could_be_undone(self):
+        secrets = FakeSecrets()
+        cache = self.signed_in(secrets)
+        secrets.clear_ok = False
+        for revoke in (None, (503, {}), (400, {"error": "invalid_request"})):
+            with self.assertRaises(g.SignOutIncomplete):
+                self.logout_with(FakeGoogle(revoke=revoke), secrets)
+            self.assertEqual(secrets.data.get("default"), "rt1")
+            self.assertIn("default", g.read_json(self.accounts, {}))
+            self.assertIn("google", [c.get("type") for c in g.read_json(self.config, {})["calendars"]])
+            self.assertTrue(os.path.exists(cache))
+
+    def test_logout_without_revocation_still_removes_the_local_token(self):
+        secrets = FakeSecrets()
+        cache = self.signed_in(secrets)
+        with self.assertRaises(g.RevokeUnconfirmed):
+            self.logout_with(FakeGoogle(revoke=None), secrets)
+        self.assertNotIn("default", secrets.data)
+        self.assertNotIn("default", g.read_json(self.accounts, {}))
+        self.assertFalse(os.path.exists(cache))
+
+    def test_logout_accepts_an_already_invalid_token_or_a_kept_dead_one(self):
+        secrets = FakeSecrets()
+        self.signed_in(secrets)
+        self.logout_with(FakeGoogle(revoke=(400, {"error": "invalid_token"})), secrets)
+        self.assertNotIn("default", g.read_json(self.accounts, {}))
+        # Revoked but the keyring refused: the token is dead, so the account goes.
+        secrets = FakeSecrets()
+        self.signed_in(secrets)
+        secrets.clear_ok = False
+        self.logout_with(FakeGoogle(), secrets)
+        self.assertNotIn("default", g.read_json(self.accounts, {}))
+
+    def test_secrets_clear_reports_a_failing_keyring(self):
+        tool = os.path.join(self.tmp.name, "secret-tool")
+        for code, expected in ((0, True), (1, False)):
+            with open(tool, "w") as fh:
+                fh.write(f"#!/bin/sh\nexit {code}\n")
+            os.chmod(tool, 0o755)
+            store = g.Secrets(state_dir=self.tmp.name, tool=tool)
+            self.assertIs(store.clear("default"), expected)
 
     def test_bundled_client_is_the_fallback(self):
         bundled = os.path.join(self.tmp.name, "bundled.json")
