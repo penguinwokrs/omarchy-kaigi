@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "penguinwokrs.kaigi",
   "name": "Kaigi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "penguinwokrs",
   "license": "Apache-2.0",
   "description": "Meeting bar for Omarchy: next meeting and countdown, one-click join, start/end notifications and auto-join, synced from Google Calendar.",
