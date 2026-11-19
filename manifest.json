@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "author": "penguinwokrs",
   "license": "Apache-2.0",
-  "description": "Unofficial MeetingBar-style meeting bar for Omarchy: next meeting and countdown, one-click join, start/end notifications and auto-join, synced from Google Calendar.",
+  "description": "Meeting bar for Omarchy: next meeting and countdown, one-click join, start/end notifications and auto-join, synced from Google Calendar.",
   "kinds": [
     "service",
     "bar-widget"

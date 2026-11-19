@@ -46,8 +46,7 @@ cd omarchy-kaigi
 
 ## カレンダー：Googleでログイン
 
-Kaigi は、MeetingBar の「Google Calendar API」連携と同じように Google Calendar API を使います。
-MeetingBar と同じく、Kaigi 自身の OAuth クライアント（`bin/google-client.json`）を同梱しています。
+Kaigi は Google Calendar API を使い、Kaigi 自身の OAuth クライアント（`bin/google-client.json`）を同梱しています。
 パネルを開いて **Googleでログイン** を押し、アカウントを選んで読み取りを許可するだけで使えます。
 
 Kaigi の OAuth クライアントは Google の審査（アプリの確認）を通過しています。
@@ -104,7 +103,7 @@ Google の項目と並べて、あるいは代わりに、`.ics` のURLやファ
 ## 設定
 
 パネルの **設定** ボタン、または `omarchy-shell kaigi openSettings` で設定画面が開きます。
-MeetingBar の環境設定と同じように次のタブがあり、変更はその場で保存されます。
+次のタブがあり、変更はその場で保存されます。
 
 - **一般**: 自動参加、開始と終了の通知とそれぞれのタイミング、会議の開き方
 - **カレンダー**: Google アカウント（追加・ログアウト）、アカウントごとに表示するカレンダー、アカウントごとの Chrome プロファイル、iCal フィード、表示する期間
@@ -115,8 +114,6 @@ MeetingBar の環境設定と同じように次のタブがあり、変更はそ
 設定はすべて `~/.config/kaigi/config.json`（本人だけが読める権限）に保存されます。
 スクリプトからは `omarchy-shell kaigi set <キー> <JSON>` で変えられます。
 例: `omarchy-shell kaigi set eventTimeFormat '"hide"'`
-
-設定の名前と初期値は MeetingBar に合わせています。
 
 **動作の設定**（`config.json`）:
 
@@ -132,11 +129,11 @@ MeetingBar の環境設定と同じように次のタブがあり、変更はそ
 | `pastEventsAppereance` | `show_inactive` | `show_inactive`、`hide` |
 | `joinEventNotification` / `…Time` | `true` / `0` | 開始の N 秒前に通知する |
 | `endOfEventNotification` / `…Time` | `true` / `0` | 終了の N 秒前に通知する |
-| `automaticEventJoin` / `…Time` | `false` / `0` | 開始の N 秒前に会議を開く。MeetingBar と同じく、未返答や仮承諾の招待も対象。除きたいときは `showPendingEvents` / `showTentativeEvents` を `hide` にする（メニューからも消える） |
+| `automaticEventJoin` / `…Time` | `false` / `0` | 開始の N 秒前に会議を開く。未返答や仮承諾の招待も対象。除きたいときは `showPendingEvents` / `showTentativeEvents` を `hide` にする（メニューからも消える） |
 | `actionGraceSeconds` | `300` | スリープ明けなどで時刻を過ぎていても、この秒数以内なら実行する |
-| `openMeetingsIn` | `browser` | `browser` は `xdg-open` で既定のブラウザに開く（MeetingBar の「標準のウェブブラウザー」と同じ）。`webapp` は `omarchy-launch-webapp` で、今いるワークスペースに単独のウィンドウとして開く（Chrome 系ブラウザのみ。Omarchy 向けの追加機能） |
-| `providerOpeningModes` | `{}` | サービスごとの開き方。例: `{"zoom": "zoomApp", "teams": "teamsApp"}`。値は `default`（`openMeetingsIn` に従う）、`browser`、`webapp`、または下の「対応サービス」にあるアプリの指定。アプリが入っていなければブラウザで開く（MeetingBar と同じ） |
-| `chromeProfile` | `""` | `webapp` のときに会議を開く Chrome のプロファイルのフォルダ名（`Default`、`Profile 2` など。`chrome://version` で確認できる）。カレンダーごとにも指定できる。空なら最後に使ったプロファイル。Google アカウントをプロファイルで分けている場合に便利（Omarchy 向けの追加機能。MeetingBar にはない） |
+| `openMeetingsIn` | `browser` | `browser` は `xdg-open` で既定のブラウザに開く。`webapp` は `omarchy-launch-webapp` で、今いるワークスペースに単独のウィンドウとして開く（Chrome 系ブラウザのみ） |
+| `providerOpeningModes` | `{}` | サービスごとの開き方。例: `{"zoom": "zoomApp", "teams": "teamsApp"}`。値は `default`（`openMeetingsIn` に従う）、`browser`、`webapp`、または下の「対応サービス」にあるアプリの指定。アプリが入っていなければブラウザで開く |
+| `chromeProfile` | `""` | `webapp` のときに会議を開く Chrome のプロファイルのフォルダ名（`Default`、`Profile 2` など。`chrome://version` で確認できる）。カレンダーごとにも指定できる。空なら最後に使ったプロファイル。Google アカウントをプロファイルで分けている場合に便利 |
 | `customRegexes` | `[]` | 追加の会議リンクのパターン。最後に試す |
 | `filterEventRegexes` | `[]` | タイトルが一致した予定を隠す |
 | `dismissedEvents` | `[]` | 無視する予定のID |
@@ -148,14 +145,14 @@ MeetingBar の環境設定と同じように次のタブがあり、変更はそ
 |---|---|---|
 | `eventTitleFormat` | `show` | `show`、`generic`、`dot`、`none` |
 | `eventTimeFormat` | `show` | `show`、`hide` |
-| `statusbarEventTitleLength` | `30` | 5〜55（MeetingBar は 55。時計の横に置くなら 30 くらいがちょうどよい） |
+| `statusbarEventTitleLength` | `30` | 5〜55（時計の横に置くなら 30 くらいがちょうどよい） |
 | `menuEventTitleLength` | `50` | |
 | `showEventEndTime` | `true` | |
 | `showEventMaxTimeUntilEventEnabled` / `…Threshold` | `false` / `60` | N 分以内に始まる予定だけ表示する |
 
 ## 対応サービス
 
-MeetingBar が検出する69種類のサービスのリンクを、すべて同じパターンで検出します（`bin/services.json`）。Google Meet、Zoom、Microsoft Teams、Webex、Jitsi、Slack ハドル、Discord、Whereby、Around、Lark / Feishu、StreamYard、Riverside など。Outlook の SafeLinks や Google のリダイレクトも、MeetingBar と同じく元のURLに戻してから判定します。
+69種類のサービスの会議リンクを検出します（パターンは `bin/services.json`）。Google Meet、Zoom、Microsoft Teams、Webex、Jitsi、Slack ハドル、Discord、Whereby、Around、Lark / Feishu、StreamYard、Riverside など。Outlook の SafeLinks や Google のリダイレクトは、元のURLに戻してから判定します。
 
 設定画面の「一般 → サービスごとの開き方」で、次のサービスはアプリで開くように指定できます。アプリが入っていないとき（URLスキームの登録がないとき）は通知を出してブラウザで開きます。
 

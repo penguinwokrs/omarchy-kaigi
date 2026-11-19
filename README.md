@@ -48,9 +48,8 @@ Then open the popup and follow the Google sign-in steps below.
 
 ## Calendars: Google sign-in
 
-Kaigi talks to the Google Calendar API, like MeetingBar's "Google Calendar
-API" provider does, and ships its own OAuth client (`bin/google-client.json`),
-as MeetingBar does. Open the popup, press **Googleでログイン / Sign in with
+Kaigi talks to the Google Calendar API and ships its own OAuth client
+(`bin/google-client.json`). Open the popup, press **Googleでログイン / Sign in with
 Google**, pick your account and allow read access. That's all.
 
 Google has verified Kaigi's OAuth client, so sign-in goes straight to Google's
@@ -147,8 +146,8 @@ says which attendee is you.
 ## Settings
 
 Open the settings window from the popup's **設定 / Settings** button, or run
-`omarchy-shell kaigi openSettings`. Like MeetingBar's Preferences, it has
-these tabs, and changes save immediately:
+`omarchy-shell kaigi openSettings`. It has these tabs, and changes save
+immediately:
 
 - **General:** auto-join, start and end notifications with their timing, and
   how and in which Chrome profile meetings open.
@@ -166,8 +165,6 @@ Everything is stored in `~/.config/kaigi/config.json` (0600). From a script,
 use `omarchy-shell kaigi set <key> <json>`, for example
 `omarchy-shell kaigi set eventTimeFormat '"hide"'`.
 
-Settings use MeetingBar's names and default values.
-
 **Behaviour** goes in `config.json`:
 
 | key | default | values |
@@ -182,11 +179,11 @@ Settings use MeetingBar's names and default values.
 | `pastEventsAppereance` | `show_inactive` | `show_inactive`, `hide` |
 | `joinEventNotification` / `…Time` | `true` / `0` | notification N seconds before start |
 | `endOfEventNotification` / `…Time` | `true` / `0` | notification N seconds before end |
-| `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start. As in MeetingBar, this includes invitations you have not answered or answered "maybe"; set `showPendingEvents` / `showTentativeEvents` to `hide` to leave those out (which also hides them from the menu) |
+| `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start. This includes invitations you have not answered or answered "maybe"; set `showPendingEvents` / `showTentativeEvents` to `hide` to leave those out (which also hides them from the menu) |
 | `actionGraceSeconds` | `300` | still fire this late, e.g. after suspend |
-| `openMeetingsIn` | `browser` | `browser` opens the link with `xdg-open` in your default browser, like MeetingBar's "Default Browser". `webapp` opens it as its own window on the current workspace with `omarchy-launch-webapp` (Chromium-based browsers; an Omarchy addition) |
-| `providerOpeningModes` | `{}` | per-service opening, e.g. `{"zoom": "zoomApp", "teams": "teamsApp"}`. Values: `default` (follow `openMeetingsIn`), `browser`, `webapp`, or an app mode from "Supported services" below. Without the app installed, the link opens in the browser (as in MeetingBar) |
-| `chromeProfile` | `""` | With `webapp`: the Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Also settable per calendar. Empty means the last used profile. Useful if you keep Google accounts in separate Chrome profiles (an Omarchy addition; MeetingBar has no profiles) |
+| `openMeetingsIn` | `browser` | `browser` opens the link with `xdg-open` in your default browser. `webapp` opens it as its own window on the current workspace with `omarchy-launch-webapp` (Chromium-based browsers only) |
+| `providerOpeningModes` | `{}` | per-service opening, e.g. `{"zoom": "zoomApp", "teams": "teamsApp"}`. Values: `default` (follow `openMeetingsIn`), `browser`, `webapp`, or an app mode from "Supported services" below. Without the app installed, the link opens in the browser |
+| `chromeProfile` | `""` | With `webapp`: the Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Also settable per calendar. Empty means the last used profile. Useful if you keep Google accounts in separate Chrome profiles |
 | `customRegexes` | `[]` | extra link patterns, tried last |
 | `filterEventRegexes` | `[]` | hide events whose title matches |
 | `dismissedEvents` | `[]` | event ids to ignore |
@@ -199,18 +196,17 @@ only when `config.json` doesn't set them:
 |---|---|---|
 | `eventTitleFormat` | `show` | `show`, `generic`, `dot`, `none` |
 | `eventTimeFormat` | `show` | `show`, `hide` |
-| `statusbarEventTitleLength` | `30` | 5–55 (MeetingBar uses 55; 30 fits better beside the clock) |
+| `statusbarEventTitleLength` | `30` | 5–55 (30 fits well beside the clock) |
 | `menuEventTitleLength` | `50` | |
 | `showEventEndTime` | `true` | |
 | `showEventMaxTimeUntilEventEnabled` / `…Threshold` | `false` / `60` | show only events starting within N minutes |
 
 ## Supported services
 
-Kaigi detects links of all 69 services MeetingBar detects, with the same
-patterns (`bin/services.json`): Google Meet, Zoom, Microsoft Teams, Webex,
+Kaigi detects links of 69 services (patterns in `bin/services.json`): Google Meet, Zoom, Microsoft Teams, Webex,
 Jitsi, Slack huddles, Discord, Whereby, Around, Lark / Feishu, StreamYard,
-Riverside and more. Like MeetingBar, it unwraps Outlook SafeLinks and Google
-redirects first.
+Riverside and more. It unwraps Outlook SafeLinks and Google redirects
+first.
 
 In Settings → General → "Per-service opening", these services can open in
 their app. When the app is not installed (no handler for its URL scheme),
