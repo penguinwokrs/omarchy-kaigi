@@ -321,3 +321,38 @@ test("attendee summary puts the organizer first and leaves you out", () => {
   assert.equal(M.attendeeSummary(e, "Attendees (%1):", "+%1 more", 8), "Attendees (5): Ana, Ben, Cy, Di")
   assert.equal(M.attendeeSummary(ev(0, 30), "A (%1):", "+%1", 8), "")
 })
+
+test("a service can open in a browser of its own", () => {
+  const meet = "https://meet.google.com/abc-defg-hij"
+  const browsers = [{ id: "firefox.desktop" }, { id: "google-chrome.desktop" }]
+  const p = (mode, link, handlers) => M.openPlan(link || { url: meet, service: "meet" }, { providerOpeningModes: { meet: mode, zoom_native: mode } }, handlers || null, browsers)
+  assert.deepEqual(p("browser:firefox.desktop"), { url: meet, via: "browser", unavailable: "", browser: "firefox.desktop", missingBrowser: "" })
+  // Even with "Open in" set to the web app.
+  assert.equal(M.openPlan({ url: meet, service: "meet" }, { openMeetingsIn: "webapp", providerOpeningModes: { meet: "browser:firefox.desktop" } }, null, browsers).via, "browser")
+  // Uninstalled: the default browser, naming the missing one.
+  assert.deepEqual(p("browser:brave-browser.desktop"), { url: meet, via: "browser", unavailable: "", browser: "", missingBrowser: "brave-browser.desktop" })
+  // Malformed IDs are ignored like any unknown mode.
+  assert.deepEqual(p("browser:-x.desktop"), { url: meet, via: "browser", unavailable: "" })
+  assert.deepEqual(p("browser:../evil.desktop"), { url: meet, via: "browser", unavailable: "" })
+  assert.equal(M.browserModeId("browser:firefox"), "")
+  // Before the list is read the chosen browser is taken to be there.
+  assert.deepEqual(M.openPlan({ url: meet, service: "meet" }, { providerOpeningModes: { meet: "browser:firefox.desktop" } }, null, null),
+    { url: meet, via: "browser", unavailable: "", browser: "firefox.desktop", missingBrowser: "" })
+  // A zoommtg:// link without the Zoom app falls back to the chosen browser.
+  const native = { url: "zoommtg://zoom.us/join?confno=123&pwd=x", service: "zoom_native" }
+  assert.deepEqual(p("browser:firefox.desktop", native, { zoommtg: false }),
+    { url: "https://zoom.us/j/123?pwd=x", via: "browser", unavailable: "Zoom", browser: "firefox.desktop", missingBrowser: "" })
+  assert.equal(p("browser:firefox.desktop", native).via, "app")
+})
+
+test("browserArgv puts the URL where Exec takes it, and the profile only for Chrome", () => {
+  const chrome = { exec: ["/usr/bin/google-chrome-stable", ""], urlAt: 1, profiles: true }
+  const firefox = { exec: ["firefox", "--new-window", "", "--x"], urlAt: 2, profiles: false }
+  const url = "https://meet.google.com/abc"
+  assert.deepEqual(M.browserArgv(chrome, url, "Profile 2"), ["/usr/bin/google-chrome-stable", "--profile-directory=Profile 2", url])
+  assert.deepEqual(M.browserArgv(chrome, url, ""), ["/usr/bin/google-chrome-stable", url])
+  assert.deepEqual(M.browserArgv(chrome, url, "../x;y"), ["/usr/bin/google-chrome-stable", url])
+  assert.deepEqual(M.browserArgv(firefox, url, "Profile 2"), ["firefox", "--new-window", url, "--x"])
+  assert.equal(M.browserArgv({ exec: [""], urlAt: 0 }, url, ""), null)
+  assert.equal(M.browserArgv(chrome, "javascript:alert(1)", ""), null)
+})

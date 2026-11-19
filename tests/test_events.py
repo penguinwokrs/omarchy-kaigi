@@ -376,3 +376,59 @@ class SchemeHandlerTests(unittest.TestCase):
         self.assertTrue(found["zoommtg"])
         self.assertTrue(found["msteams"])
         self.assertFalse(found["slack"])
+
+
+class WebBrowserTests(unittest.TestCase):
+    def write(self, path, text):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write(text)
+
+    def test_lists_https_handlers_from_the_main_group(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = os.path.join(tmp, "home", "applications")
+            system = os.path.join(tmp, "sys", "applications")
+            https = "MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;\n"
+            self.write(os.path.join(system, "google-chrome.desktop"),
+                       "[Desktop Entry]\nType=Application\nName=Google Chrome\nExec=sh %U\n" + https +
+                       "[Desktop Action new-private]\nName=Incognito\nExec=sh --incognito\n")
+            self.write(os.path.join(system, "fox.desktop"),
+                       "[Desktop Entry]\nType=Application\nName=Fox\nExec=sh --new-window %u --class \"Fox %%\" %i\n" + https)
+            # Hidden by the user's own copy, a wrapper, and apps that are not browsers.
+            self.write(os.path.join(system, "gone.desktop"), "[Desktop Entry]\nType=Application\nName=Gone\nExec=sh %u\n" + https)
+            self.write(os.path.join(home, "gone.desktop"), "[Desktop Entry]\nHidden=true\n")
+            self.write(os.path.join(system, "wrapper.desktop"), "[Desktop Entry]\nType=Application\nName=W\nNoDisplay=true\nExec=sh %u\n" + https)
+            self.write(os.path.join(system, "zoom.desktop"), "[Desktop Entry]\nType=Application\nName=Zoom\nExec=sh %u\nMimeType=x-scheme-handler/zoommtg;\n")
+            self.write(os.path.join(system, "missing.desktop"), "[Desktop Entry]\nType=Application\nName=Missing\nExec=no-such-binary-kaigi %u\n" + https)
+            self.write(os.path.join(system, "wrapped.desktop"),
+                       "[Desktop Entry]\nType=Application\nName=Wrapped\nExec=sh -c \"browser %u\"\n" + https)
+            self.write(os.path.join(system, "-bad.desktop"), "[Desktop Entry]\nType=Application\nName=Bad\nExec=sh %u\n" + https)
+            self.write(os.path.join(system, "vendor", "nested.desktop"), "[Desktop Entry]\nType=Application\nName=Nested\nExec=sh\n" + https)
+            old = {k: os.environ.get(k) for k in ("XDG_DATA_HOME", "XDG_DATA_DIRS")}
+            os.environ["XDG_DATA_HOME"] = os.path.join(tmp, "home")
+            os.environ["XDG_DATA_DIRS"] = os.path.join(tmp, "sys")
+            try:
+                found = me.web_browsers("google-chrome")
+            finally:
+                for k, v in old.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+        by_id = {b["id"]: b for b in found}
+        self.assertEqual(sorted(by_id), ["fox.desktop", "google-chrome.desktop", "vendor-nested.desktop"])
+        self.assertEqual(by_id["google-chrome.desktop"]["name"], "Google Chrome")
+        self.assertEqual(by_id["google-chrome.desktop"]["exec"], ["sh", ""])
+        self.assertEqual(by_id["fox.desktop"]["exec"], ["sh", "--new-window", "", "--class", "Fox %"])
+        self.assertEqual(by_id["fox.desktop"]["urlAt"], 2)
+        # Without a URL field code the URL goes last.
+        self.assertEqual(by_id["vendor-nested.desktop"]["exec"], ["sh", ""])
+        # "sh" is no Chrome, so no profile flag for any of them.
+        self.assertFalse(any(b["profiles"] for b in found))
+
+    def test_chrome_family_follows_the_profiles_that_were_read(self):
+        self.assertEqual(me.chrome_family(["/usr/bin/google-chrome-stable", ""]), "google-chrome")
+        self.assertEqual(me.chrome_family(["chromium", ""]), "chromium")
+        self.assertEqual(me.chrome_family(["firefox", ""]), "")
+        # Beta keeps its profiles in ~/.config/google-chrome-beta.
+        self.assertEqual(me.chrome_family(["/usr/bin/google-chrome-beta", ""]), "")

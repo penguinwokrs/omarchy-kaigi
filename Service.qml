@@ -27,6 +27,7 @@ Item {
   readonly property string firedPath: stateDir + "/fired.json"
   readonly property string helperPath: decodeURIComponent(String(Qt.resolvedUrl("bin/kaigi-events")).replace(/^file:\/\//, ""))
   readonly property string googlePath: decodeURIComponent(String(Qt.resolvedUrl("bin/kaigi-google")).replace(/^file:\/\//, ""))
+  readonly property string launchBrowserPath: decodeURIComponent(String(Qt.resolvedUrl("bin/kaigi-launch-browser")).replace(/^file:\/\//, ""))
 
   // ---- Google sign-in state (bin/kaigi-google) ----
   property bool googleClient: false
@@ -67,6 +68,7 @@ Item {
   property var feeds: []
   property var chromeProfiles: []
   property var schemeHandlers: null    // { zoommtg: true, msteams: false, ... }
+  property var browsers: null          // [{ id, name, exec, urlAt, profiles }]; null until read
 
   property var fired: ({})
   property bool firedLoaded: false
@@ -103,6 +105,7 @@ Item {
     root.feeds = Array.isArray(out.feeds) ? out.feeds.slice(0, 20) : []
     root.chromeProfiles = Array.isArray(out.chromeProfiles) ? out.chromeProfiles.slice(0, 20) : []
     root.schemeHandlers = out.schemeHandlers && typeof out.schemeHandlers === "object" ? out.schemeHandlers : null
+    root.browsers = Array.isArray(out.browsers) ? out.browsers.slice(0, 40) : null
     root.lastUpdated = Number(out.generatedAt) || Date.now()
     root.loadedOnce = true
     root.now = Date.now()
@@ -229,9 +232,11 @@ Item {
   // How to open a link (Model.openPlan): in a meeting app through its URL
   // scheme, or in the browser. webapp windows use the Chrome profile that
   // holds the right Google sign-in, from chromeProfile in config.json (per
-  // calendar or global); without one Chrome uses the profile used last.
+  // calendar or global); without one Chrome uses the profile used last. A
+  // service set to a browser of its own opens in it, with that profile too
+  // when it is the Chrome the profiles were read from.
   function planFor(event) {
-    return event && event.link ? Model.openPlan(event.link, root.config, root.schemeHandlers) : null
+    return event && event.link ? Model.openPlan(event.link, root.config, root.schemeHandlers, root.browsers) : null
   }
 
   function launchArgv(plan, profile) {
@@ -239,6 +244,15 @@ Item {
       var argv = ["omarchy-launch-webapp", plan.url]
       if (/^[A-Za-z0-9 _.-]{1,40}$/.test(String(profile || ""))) argv.push("--profile-directory=" + profile)
       return argv
+    }
+    if (plan.via === "browser" && plan.browser && /^https?:\/\//.test(plan.url)) {
+      var list = root.browsers || []
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id === plan.browser) {
+          var own = Model.browserArgv(list[i], plan.url, profile)
+          if (own) return ["bash", root.launchBrowserPath].concat(own)
+        }
+      }
     }
     return ["xdg-open", plan.url]
   }
@@ -250,6 +264,10 @@ Item {
     if (plan.unavailable)
       Util.execArgv(["omarchy-notification-send", "--app-name", "Kaigi", "-g", "\uDB80\uDCF0", "-u", "normal",
                      strings.t("appUnavailable.title").arg(plan.unavailable), strings.t("appUnavailable.body")])
+    else if (plan.missingBrowser)
+      Util.execArgv(["omarchy-notification-send", "--app-name", "Kaigi", "-g", "\uDB80\uDCF0", "-u", "normal",
+                     strings.t("browserUnavailable.title").arg(plan.missingBrowser.replace(/\.desktop$/, "")),
+                     strings.t("browserUnavailable.body")])
     Util.execArgv(launchArgv(plan, event.browserProfile))
     return true
   }
@@ -281,7 +299,12 @@ Item {
     var argv = ["omarchy-notification-send", "--app-name", "Kaigi", "-g", "\uDB80\uDCF0", "-u", "normal",
                 title, Model.plainNotificationText(body)]
     var plan = planFor(event)
-    if (plan && Model.launchableUrl(plan.url))
+    var validId = /^[0-9a-f]{1,64}$/.test(String(event.id))
+    // When the chosen browser is gone, Join goes through join() like the
+    // panel does, so it says so before opening the default browser.
+    if (plan && Model.launchableUrl(plan.url) && plan.missingBrowser && validId)
+      argv = argv.concat(["--action", strings.t("join"), "omarchy-shell", "-q", "kaigi", "join", String(event.id)])
+    else if (plan && Model.launchableUrl(plan.url))
       argv = argv.concat(["--action", strings.t("join")]).concat(launchArgv(plan, event.browserProfile))
     if (snoozable && /^[0-9a-f]{1,64}$/.test(String(event.id)))
       argv = argv.concat(["--action", strings.t("snooze").arg(root.snoozeSeconds / 60),
@@ -527,6 +550,8 @@ Item {
     function closeSettings(): string { settingsWindow.close(); return "ok" }
     // From the start notification's "Remind me again" button.
     function snooze(id: string): string { return root.snooze(id) ? "ok" : "unknown event" }
+    // From a notification's Join button when the service's browser is gone.
+    function join(id: string): string { return root.joinById(id) ? "ok" : "unknown event" }
     function createMeeting(service: string): string { return root.createMeeting(service, "") ? "ok" : "failed" }
     // A Meet meeting as the signed-in account with this address.
     function createMeetingAs(service: string, email: string): string {

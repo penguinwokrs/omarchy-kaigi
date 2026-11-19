@@ -25,6 +25,8 @@ import html
 import json
 import os
 import re
+import shlex
+import shutil
 import sys
 import time
 import urllib.parse
@@ -567,6 +569,103 @@ def scheme_handlers():
     return {s: s in found for s in APP_SCHEMES}
 
 
+# Browsers a service can be set to open in (providerOpeningModes
+# "browser:<id>"): installed apps whose .desktop entry handles https.
+
+DESKTOP_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,100}\.desktop")
+URL_CODES = ("%u", "%U", "%f", "%F")
+
+
+def desktop_entry(path):
+    """The keys of a .desktop file's [Desktop Entry] group (not its actions)."""
+    keys, group = {}, None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if line.startswith("["):
+                    group = line
+                elif group == "[Desktop Entry]" and "=" in line and not line.startswith("#"):
+                    key, _sep, value = line.partition("=")
+                    keys.setdefault(key.strip(), value.strip())
+    except OSError:
+        return {}
+    return keys
+
+
+def exec_argv(line):
+    """Exec= as (argv, index of the URL argument), or None. Field codes other
+    than the URL one are dropped; without one the URL goes last."""
+    try:
+        words = shlex.split(line)
+    except ValueError:
+        return None
+    argv, url_at = [], -1
+    for word in words:
+        if word in URL_CODES:
+            if url_at < 0:
+                url_at = len(argv)
+                argv.append("")
+            continue
+        # A URL inside a longer word (--app=%u, sh -c "browser %u") can't be
+        # passed as an argument of its own: leave that browser out.
+        if any(code in word.replace("%%", "") for code in URL_CODES):
+            return None
+        word = re.sub(r"%(.)", lambda m: "%" if m.group(1) == "%" else "", word)
+        if word:
+            argv.append(word[:200])
+    if not argv or url_at == 0 or len(argv) > 20 or not shutil.which(argv[0]):
+        return None
+    if url_at < 0:
+        url_at = len(argv)
+        argv.append("")
+    return argv, url_at
+
+
+def chrome_family(argv):
+    """Which Chrome config folder the browser keeps its profiles in."""
+    name = os.path.basename(argv[0])
+    # Beta and unstable keep theirs in folders of their own.
+    if name in ("google-chrome", "google-chrome-stable"):
+        return "google-chrome"
+    if name in ("chromium", "chromium-browser"):
+        return "chromium"
+    return ""
+
+
+def web_browsers(chrome_browser=""):
+    """[{id, name, exec, urlAt, profiles}] sorted by name. profiles is true for
+    the browser whose profiles chromeProfile names (kaigi_google.chrome_state)."""
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local", "share")
+    seen, out = set(), []
+    for base in [data_home] + xdg_dirs("XDG_DATA_DIRS", "/usr/local/share:/usr/share"):
+        root = os.path.join(base, "applications")
+        for dirpath, _dirs, files in sorted(os.walk(root)):
+            for name in sorted(files):
+                path = os.path.join(dirpath, name)
+                app_id = os.path.relpath(path, root).replace(os.sep, "-")
+                if not name.endswith(".desktop") or app_id in seen:
+                    continue
+                # The first directory with an ID wins, even when it hides the app.
+                seen.add(app_id)
+                entry = desktop_entry(path)
+                mimes = [m.strip().lower() for m in entry.get("MimeType", "").split(";")]
+                if not DESKTOP_ID.fullmatch(app_id) or entry.get("Type") != "Application" \
+                        or entry.get("NoDisplay") == "true" or entry.get("Hidden") == "true" \
+                        or "x-scheme-handler/https" not in mimes:
+                    continue
+                parsed = exec_argv(entry.get("Exec", ""))
+                if not parsed:
+                    continue
+                argv, url_at = parsed
+                family = chrome_family(argv)
+                out.append({"id": app_id, "name": clip(entry.get("Name") or app_id[:-8], 60),
+                            "exec": argv, "urlAt": url_at,
+                            "profiles": bool(family) and family == chrome_browser})
+    out.sort(key=lambda b: (b["name"].lower(), b["id"]))
+    return out[:40]
+
+
 # --------------------------------------------------------------------------
 # Feeds
 
@@ -900,6 +999,7 @@ def main(argv=None):
     chrome = google.chrome_state()
     result["chromeProfiles"] = google.chrome_profiles(chrome)
     result["schemeHandlers"] = scheme_handlers()
+    result["browsers"] = web_browsers(chrome["browser"])
     google_accounts = google.read_json(google.ACCOUNTS_PATH, {})
     for i, (config_index, cal) in enumerate(calendars):
         name = clip(str(cal.get("name") or f"Calendar {i + 1}"), 80)

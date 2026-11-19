@@ -79,7 +79,7 @@ Kaigi の OAuth クライアントは Google の審査（アプリの確認）�
 カレンダーを読み込みます。どのカレンダーを使うかは、設定画面の「カレンダー」タブで選べます。
 
 最初のアカウントでログインするまでは、パネルに **Googleでログイン** が表示されます。2つ目以降のアカウントは、設定画面の「カレンダー」タブの **アカウントを追加** で追加できます。追加したアカウントは
-メールアドレスで区別されます。`webapp` のとき、各アカウントの会議はそのアドレスでログインしている Chrome のプロファイルで開きます。そのアカウントで Chrome にログインしているプロファイルを優先し、なければ Google にログインしているプロファイル（最近使ったものから）を使います。カレンダーを読み込むたびに、`authuser` の番号ではなくメールアドレスで探し直すので、アカウントのログイン・ログアウトやプロファイル間の移動があっても追従します。どのプロファイルを使っているかは「カレンダー」タブに表示されます。
+メールアドレスで区別されます。`webapp` のとき（またはサービスごとの開き方で Chrome を選んだとき）、各アカウントの会議はそのアドレスでログインしている Chrome のプロファイルで開きます。そのアカウントで Chrome にログインしているプロファイルを優先し、なければ Google にログインしているプロファイル（最近使ったものから）を使います。カレンダーを読み込むたびに、`authuser` の番号ではなくメールアドレスで探し直すので、アカウントのログイン・ログアウトやプロファイル間の移動があっても追従します。どのプロファイルを使っているかは「カレンダー」タブに表示されます。
 
 ### 仕組み
 
@@ -147,8 +147,8 @@ Google のカレンダー1つずつと iCal フィード1本ずつにスイッ�
 | `automaticEventJoin` / `…Time` | `false` / `0` | 開始の N 秒前に会議を開く。未返答や仮承諾の招待も対象。未返答の招待を一部のカレンダーだけ除くときは[未返答の招待の自動参加](#未返答の招待の自動参加)を参照。`showPendingEvents` / `showTentativeEvents` を `hide` にすると全カレンダーで除かれる（メニューからも消える） |
 | `actionGraceSeconds` | `300` | スリープ明けなどで時刻を過ぎていても、この秒数以内なら実行する |
 | `openMeetingsIn` | `browser` | `browser` は `xdg-open` で既定のブラウザに開く。`webapp` は `omarchy-launch-webapp` で、今いるワークスペースに単独のウィンドウとして開く（Chrome 系ブラウザのみ） |
-| `providerOpeningModes` | `{}` | サービスごとの開き方。例: `{"zoom": "zoomApp", "teams": "teamsApp"}`。値は `default`（`openMeetingsIn` に従う）、`browser`、`webapp`、または下の「対応サービス」にあるアプリの指定。アプリが入っていなければブラウザで開く |
-| `chromeProfile` | `""` | `webapp` のときに会議を開く Chrome のプロファイルのフォルダ名（`Default`、`Profile 2` など。`chrome://version` で確認できる）。空なら最後に使ったプロファイル。Google アカウントはログインしているプロファイルを自動で使うので、これは iCal カレンダーと、どのプロファイルにもログインしていないアカウント用。カレンダーごとにも指定できる。Google のカレンダーで指定した場合は、そのプロファイルにアカウントがログインしている間だけ使い、いなくなったら自動に戻る |
+| `providerOpeningModes` | `{}` | サービスごとの開き方。例: `{"zoom": "zoomApp", "teams": "teamsApp"}`。値は `default`（`openMeetingsIn` に従う）、`browser`、`webapp`、`browser:<desktop ファイル名>`（そのサービス用のブラウザ。例: `browser:firefox.desktop`）、または下の「対応サービス」にあるアプリの指定。アプリ（またはそのブラウザ）が入っていなければ既定のブラウザで開く |
+| `chromeProfile` | `""` | `webapp` のとき、またはサービスごとの開き方で Chrome を選んだときに会議を開く Chrome のプロファイルのフォルダ名（`Default`、`Profile 2` など。`chrome://version` で確認できる）。空なら最後に使ったプロファイル。Google アカウントはログインしているプロファイルを自動で使うので、これは iCal カレンダーと、どのプロファイルにもログインしていないアカウント用。カレンダーごとにも指定できる。Google のカレンダーで指定した場合は、そのプロファイルにアカウントがログインしている間だけ使い、いなくなったら自動に戻る |
 | `customRegexes` | `[]` | 追加の会議リンクのパターン。最後に試す |
 | `filterEventRegexes` | `[]` | タイトルが一致した予定を隠す |
 | `dismissedEvents` | `[]` | 「この予定を非表示」で非表示にした予定のID。通知と自動参加の対象からも外れる |
@@ -200,7 +200,7 @@ Google のカレンダー1つずつと iCal フィード1本ずつにスイッ�
 | Tuple | `tupleApp` | `tuple://c/…` | Tuple のアプリ（Linux 版があれば） |
 | Facebook Workspace | `workplaceApp` | `workchat://room/?joinurl=…` | （Linux 版は確認できていません） |
 
-イベントに `zoommtg://` のリンクが直接書かれている場合は、そのまま Zoom アプリで開きます（なければ https に戻してブラウザで開く）。`discord://` のリンクは Discord アプリで開きます。どのサービスも `browser` か `webapp` を個別に指定できます。
+イベントに `zoommtg://` のリンクが直接書かれている場合は、そのまま Zoom アプリで開きます（なければ https に戻してブラウザで開く）。`discord://` のリンクは Discord アプリで開きます。どのサービスも `browser` か `webapp` を個別に指定できるほか、サービスごとに使うブラウザも選べます。一覧に出るのは、`.desktop` ファイルで https のリンクを開けると登録されているアプリです（値は `browser:<desktop ファイル名>`。例: `browser:firefox.desktop`）。起動は Omarchy が既定のブラウザを開くときと同じく、`uwsm-app` で独立したユニットとして起動し、ブラウザのウィンドウを前面に出します。選んだブラウザを後でアンインストールした場合は、通知を出して既定のブラウザで開きます（通知の「参加」ボタンからでも同じ）。Chrome のプロファイルを指定して開くのは、Kaigi がプロファイルを読んでいる Chrome（または Chromium）を選んだときだけです。
 
 ## マウス・キー・IPC
 
@@ -210,6 +210,7 @@ Google のカレンダー1つずつと iCal フィード1本ずつにスイッ�
 - **通知**: 開始の通知には「参加」と「5分後にもう一度通知」のボタンがあります。もう一度届いた通知にも同じボタンがあるので、また後にできます。
 - **IPC**:
   - `omarchy-shell kaigi joinNext`（キーに割り当てると便利）
+  - `omarchy-shell kaigi join <予定のID>`（サービス用に選んだブラウザが見つからないとき、通知の「参加」ボタンが使う）
   - `omarchy-shell kaigi refresh`
   - `omarchy-shell kaigi next`
   - `omarchy-shell kaigi googleLogin`
@@ -222,7 +223,7 @@ Google のカレンダー1つずつと iCal フィード1本ずつにスイッ�
 ## 仕組み
 
 - `bin/kaigi_google.py` と `bin/kaigi-google` が Google へのログインと Calendar API を担当します。Python の標準ライブラリだけで動きます。
-- `bin/kaigi-events` も標準ライブラリだけで動きます。フィードを読み、繰り返しの予定（RRULE、EXDATE、RDATE、RECURRENCE-ID、タイムゾーン、夏時間）を展開し、`bin/services.json` にある69種類のサービスのパターンで会議リンクを探します。会議アプリの URL スキーム（`zoommtg` など）が登録されているかも調べます。結果は JSON で出力します。
+- `bin/kaigi-events` も標準ライブラリだけで動きます。フィードを読み、繰り返しの予定（RRULE、EXDATE、RDATE、RECURRENCE-ID、タイムゾーン、夏時間）を展開し、`bin/services.json` にある69種類のサービスのパターンで会議リンクを探します。会議アプリの URL スキーム（`zoommtg` など）が登録されているか、どのブラウザが入っているかも調べます。結果は JSON で出力します。
 - `Service.qml` はシェルに1つだけ常駐します。1分ごとにヘルパーを呼び、5秒ごとに通知や自動参加の時刻を確認します。通知や参加の前に、その操作を `~/.local/state/kaigi/fired.json` に記録します。そのため、モニターが複数あっても、プラグインの再読み込みや `omarchy restart shell` をしても、同じ操作は繰り返されません。
 - 開くのは、既知のサービス（または `customRegexes`）に一致した `https`、`http`、`zoommtg`、`discord` のURLと、そこから作った会議アプリ用のURL（`msteams`、`jitsi-meet`、`slack`、`riversidefm`、`tuple`、`workchat`）、それに同じスキームのブックマークと新しい会議のページだけです。URLはシェルを通さず、引数として渡します。
 - `Panel.qml` がバーのウィジェットとパネル、`SettingsWindow.qml` が設定画面です。`Model.js` に予定の選び方、表示、タイミングの計算が入っています。

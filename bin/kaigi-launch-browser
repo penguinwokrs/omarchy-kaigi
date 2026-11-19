@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Open a meeting in the browser chosen for its service (providerOpeningModes
+# "browser:<id>"; Service.qml builds the command from the browser's Exec=).
+# It starts the browser the way omarchy-launch-browser starts the default one:
+# in a unit of its own through uwsm-app, so it is not part of the shell's
+# session, then focuses the browser's window on Hyprland.
+#
+# Usage: kaigi-launch-browser <browser command> [arguments...]
+
+(($# >= 2)) || exit 1
+[[ $1 != -* ]] || exit 1
+
+if command -v systemd-run >/dev/null && command -v uwsm-app >/dev/null; then
+  systemd-run --user --quiet --collect --unit="kaigi-browser-$(date +%s%N)" \
+    --property=StandardOutput=null --property=StandardError=null \
+    uwsm-app -- "$@" || setsid -f "$@" >/dev/null 2>&1
+else
+  setsid -f "$@" >/dev/null 2>&1
+fi
+
+# The window class is the command's name without -stable (google-chrome,
+# chromium, firefox). A browser that was not running has no window yet, and
+# then nothing is focused, as with omarchy-launch-browser.
+if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && command -v omarchy-hyprland-focus-app >/dev/null; then
+  app=$(basename "$1" -stable)
+  omarchy-hyprland-focus-app "^${app//[^A-Za-z0-9_-]/.}.*$" >/dev/null 2>&1 || true
+fi

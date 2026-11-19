@@ -113,8 +113,8 @@ calendars on the settings window's Calendars tab.
 The popup offers **Googleでログイン / Sign in with Google** until the first
 account is signed in. Add more accounts with **アカウントを追加 / Add account**
 on the settings window's Calendars tab. Each account is keyed by its address.
-With `webapp`, each account's meetings open in the Chrome profile signed in
-with that address: the profile whose Chrome sign-in it is, else one where it
+With `webapp` (or a service set to open in Chrome), each account's meetings
+open in the Chrome profile signed in with that address: the profile whose Chrome sign-in it is, else one where it
 is signed in to Google (the most recently used first). Kaigi looks this up
 every time it reads your calendars, by address rather than by the account's
 `authuser` number, so it keeps working when accounts sign in or out or move
@@ -218,8 +218,8 @@ use `omarchy-shell kaigi set <key> <json>`, for example
 | `automaticEventJoin` / `…Time` | `false` / `0` | open the meeting N seconds before start. This includes invitations you have not answered or answered "maybe". To leave out unanswered invitations from some calendars only, see [Auto-join for invitations you haven't answered](#auto-join-for-invitations-you-havent-answered). `showPendingEvents` / `showTentativeEvents` set to `hide` leave them out everywhere (and hide them from the menu) |
 | `actionGraceSeconds` | `300` | still fire this late, e.g. after suspend |
 | `openMeetingsIn` | `browser` | `browser` opens the link with `xdg-open` in your default browser. `webapp` opens it as its own window on the current workspace with `omarchy-launch-webapp` (Chromium-based browsers only) |
-| `providerOpeningModes` | `{}` | per-service opening, e.g. `{"zoom": "zoomApp", "teams": "teamsApp"}`. Values: `default` (follow `openMeetingsIn`), `browser`, `webapp`, or an app mode from "Supported services" below. Without the app installed, the link opens in the browser |
-| `chromeProfile` | `""` | With `webapp`: the Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Empty means the last used profile. Google accounts use the profile signed in to them instead; this one is for iCal calendars and accounts no profile is signed in to. Also settable per calendar: on a Google calendar it is kept while that profile is still signed in to the account, otherwise Kaigi goes back to finding the profile |
+| `providerOpeningModes` | `{}` | per-service opening, e.g. `{"zoom": "zoomApp", "teams": "teamsApp"}`. Values: `default` (follow `openMeetingsIn`), `browser`, `webapp`, `browser:<desktop file>` (a browser of its own, e.g. `browser:firefox.desktop`), or an app mode from "Supported services" below. Without the app (or that browser) installed, the link opens in the default browser |
+| `chromeProfile` | `""` | With `webapp`, or a service set to open in Chrome: the Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Empty means the last used profile. Google accounts use the profile signed in to them instead; this one is for iCal calendars and accounts no profile is signed in to. Also settable per calendar: on a Google calendar it is kept while that profile is still signed in to the account, otherwise Kaigi goes back to finding the profile |
 | `customRegexes` | `[]` | extra link patterns, tried last |
 | `filterEventRegexes` | `[]` | hide events whose title matches |
 | `dismissedEvents` | `[]` | ids of events you hid with "Hide this event"; they get no notifications or auto-join either |
@@ -281,7 +281,14 @@ Kaigi shows a notification and opens the link in the browser.
 
 A `zoommtg://` link in the event opens in the Zoom app directly (or, without
 it, as https in the browser), and `discord://` links open in Discord. Every
-service can also be set to `browser` or `webapp` on its own.
+service can also be set to `browser` or `webapp` on its own, or to a browser
+of its own: the list shows the installed apps whose `.desktop` entry opens
+https links (value `browser:<desktop file>`, e.g. `browser:firefox.desktop`).
+It starts the way Omarchy starts the default browser (in its own unit
+through `uwsm-app`, then its window is focused). If that browser is
+uninstalled later, Kaigi notifies you and opens the meeting in the default
+browser. The Chrome profile is passed only when the chosen
+browser is the Chrome (or Chromium) whose profiles Kaigi reads.
 
 ## Mouse, keys, IPC
 
@@ -304,6 +311,8 @@ service can also be set to `browser` or `webapp` on its own.
   again.
 - **IPC:**
   - `omarchy-shell kaigi joinNext` (bind it to a key)
+  - `omarchy-shell kaigi join <event id>` (what a notification's Join button
+    runs when the service's chosen browser is gone)
   - `omarchy-shell kaigi refresh`
   - `omarchy-shell kaigi next`
   - `omarchy-shell kaigi googleLogin`
@@ -324,7 +333,8 @@ service can also be set to `browser` or `webapp` on its own.
   feeds and expands recurrences (RRULE, EXDATE, RDATE, RECURRENCE-ID, TZID,
   DST), then finds the meeting link using the 69 service patterns in
   `bin/services.json`. It also checks which
-  meeting-app URL schemes (`zoommtg`, …) have a handler. It prints JSON.
+  meeting-app URL schemes (`zoommtg`, …) have a handler and which browsers
+  are installed. It prints JSON.
 - `Service.qml` runs once per shell. It polls the helper every minute and
   checks for due actions every 5 s. Before it notifies or joins, it records the
   action in `~/.local/state/kaigi/fired.json`. Because of that, multiple

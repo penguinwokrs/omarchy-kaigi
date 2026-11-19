@@ -552,19 +552,48 @@ function providerMode(config, service) {
   return typeof mode === "string" && mode ? mode : "default"
 }
 
+// A service set to a browser of its own: "browser:<desktop file ID>" (the IDs
+// bin/kaigi-events lists as browsers). The ID ends up in argv, so it is held
+// to the characters desktop IDs use and may not start with "-".
+var BROWSER_MODE = /^browser:([A-Za-z0-9][A-Za-z0-9._-]{0,100}\.desktop)$/
+
+function browserModeId(mode) {
+  var m = BROWSER_MODE.exec(String(mode || ""))
+  return m ? m[1] : ""
+}
+
 // How to open an event's link. handlers maps a URL scheme to whether an app
-// is registered for it (missing = unknown, assume yes). Returns
+// is registered for it (missing = unknown, assume yes). browsers is the list
+// of installed browsers ({ id, ... }), or null when not known yet (the chosen
+// one is then taken to be there, as handlers are). Returns
 // { url, via: "browser" | "webapp" | "app", unavailable } where unavailable
-// names the app when its link fell back to the browser, or null.
-function openPlan(link, config, handlers) {
+// names the app when its link fell back to the browser, or null. With a
+// browser chosen for the service it adds { browser, missingBrowser }: browser
+// is the ID to open browser links in, and missingBrowser the chosen ID when
+// that browser is not installed (the default browser opens it instead).
+function openPlan(link, config, handlers, browsers) {
   config = withDefaults(config)
   if (!link || !launchableUrl(link.url)) return null
   var url = String(link.url)
   var service = String(link.service || "")
   var mode = providerMode(config, service)
+  var chosen = browserModeId(mode)
+  if (chosen) {
+    var installed = !Array.isArray(browsers) || browsers.some(function(b) { return b && b.id === chosen })
+    var plan = openPlanVia(url, service, mode, "browser", handlers)
+    if (plan.via === "browser") {
+      plan.browser = installed ? chosen : ""
+      plan.missingBrowser = installed ? "" : chosen
+    }
+    return plan
+  }
   var via = mode === "browser" ? "browser"
     : mode === "webapp" ? "webapp"
     : config.openMeetingsIn === "webapp" ? "webapp" : "browser"
+  return openPlanVia(url, service, mode, via, handlers)
+}
+
+function openPlanVia(url, service, mode, via, handlers) {
 
   function hasHandler(scheme) { return !handlers || handlers[scheme] !== false }
   function viaApp(candidates, name, fallback) {
@@ -586,6 +615,19 @@ function openPlan(link, config, handlers) {
   var candidates = appUrlsFor(mode, url)
   if (candidates.length === 0) return { url: url, via: via, unavailable: "" }
   return viaApp(candidates, APP_NAMES[mode], url)
+}
+
+// argv to open url in an installed browser ({ exec, urlAt, profiles } from
+// bin/kaigi-events), with the Chrome profile when that browser keeps it.
+function browserArgv(browser, url, profile) {
+  if (!browser || !Array.isArray(browser.exec) || !launchableUrl(url)) return null
+  var at = Number(browser.urlAt)
+  if (browser.exec.length < 2 || browser.exec.length > 20 || !(at >= 1 && at < browser.exec.length) || Math.floor(at) !== at) return null
+  var argv = browser.exec.map(function(a) { return String(a) })
+  argv[at] = String(url)
+  if (browser.profiles === true && /^[A-Za-z0-9 _.-]{1,40}$/.test(String(profile || "")))
+    argv.splice(at, 0, "--profile-directory=" + profile)
+  return argv
 }
 
 // For the settings window: [{ service, name, modes: [mode...] }].
@@ -668,6 +710,8 @@ if (typeof module !== "undefined") {
     pruneFired: pruneFired,
     launchableUrl: launchableUrl,
     openPlan: openPlan,
+    browserModeId: browserModeId,
+    browserArgv: browserArgv,
     OPENING_MODES: OPENING_MODES,
     OPENING_SERVICES: OPENING_SERVICES,
     APP_NAMES: APP_NAMES,

@@ -71,6 +71,19 @@ Item {
       { value: "browser", label: strings.t("settings.openIn.browser") },
       { value: "webapp", label: strings.t("settings.openIn.webapp") }
     ]
+    // Installed browsers, and a chosen one that is gone (so the row still
+    // says what is set).
+    var browsers = root.service && root.service.browsers ? root.service.browsers : []
+    var current = Model.browserModeId(root.serviceMode(service))
+    var listed = false
+    for (var b = 0; b < browsers.length; b++) {
+      out.push({ value: "browser:" + browsers[b].id, label: strings.t("settings.service.inBrowser").arg(browsers[b].name) })
+      if (browsers[b].id === current) listed = true
+    }
+    if (current && !listed)
+      out.push({ value: "browser:" + current,
+                 label: strings.t("settings.service.inBrowser").arg(current.replace(/\.desktop$/, ""))
+                        + (root.service && root.service.browsers ? strings.t("settings.service.notInstalled") : "") })
     var modes = Model.OPENING_MODES[service] || []
     var handlers = root.service ? root.service.schemeHandlers : null
     for (var i = 0; i < modes.length; i++) {
@@ -83,6 +96,19 @@ Item {
       out.push({ value: mode, label: label })
     }
     return out
+  }
+
+  // Chrome profiles are used by the web app window, and by a service set to
+  // open in the Chrome whose profiles they are.
+  readonly property bool profilesUsed: {
+    if (str("openMeetingsIn") === "webapp") return true
+    var modes = cfg.providerOpeningModes && typeof cfg.providerOpeningModes === "object" ? cfg.providerOpeningModes : {}
+    var list = service && service.browsers ? service.browsers : []
+    for (var k in modes) {
+      var id = Model.browserModeId(modes[k])
+      for (var i = 0; id && i < list.length; i++) if (list[i].id === id && list[i].profiles === true) return true
+    }
+    return false
   }
 
   function str(key) { return String(cfg[key] === undefined || cfg[key] === null ? "" : cfg[key]) }
@@ -451,7 +477,7 @@ Item {
         label: strings.t("settings.openIn")
         options: [{ value: "browser", label: strings.t("settings.openIn.browser") }, { value: "webapp", label: strings.t("settings.openIn.webapp") }]
       }
-      ChoiceRow { key: "chromeProfile"; label: strings.t("settings.defaultProfile"); options: root.profileOptions; enabled: root.str("openMeetingsIn") === "webapp" }
+      ChoiceRow { key: "chromeProfile"; label: strings.t("settings.defaultProfile"); options: root.profileOptions; enabled: root.profilesUsed }
       Note { text: strings.t("settings.profileNote") }
 
       Heading { text: strings.t("settings.services") }
@@ -577,14 +603,14 @@ Item {
             label: strings.t("settings.accountProfile")
             value: String(acct.modelData.chromeProfile || "")
             options: root.accountProfileOptions
-            enabled: root.str("openMeetingsIn") === "webapp"
+            enabled: root.profilesUsed
             opacity: enabled ? 1 : 0.4
             foreground: root.fg
             fontFamily: root.fontFamily
             onChanged: function(v) { root.service.setCalendarProfile(acct.modelData.configIndex, v) }
           }
           Note {
-            visible: text !== "" && root.str("openMeetingsIn") === "webapp"
+            visible: text !== "" && root.profilesUsed
             color: acct.modelData.profileStale || acct.modelData.profileSource === "none" ? root.urgent : root.dim
             text: root.accountProfileNote(acct.modelData)
           }
