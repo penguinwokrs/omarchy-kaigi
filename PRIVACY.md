@@ -52,9 +52,9 @@ Kaigi uses Google user data only for features you see on your own desktop:
   signed in to each Chrome profile on your computer (Chrome's own "Local
   State" and "Preferences" files, which stay on your computer)
 - open Google Meet links, including new meetings you start from the popup,
-  as the right Google account, by adding your email address to the
-  meet.google.com link (the `authuser` parameter). Your browser sends that
-  link only to Google
+  as the right Google account, by adding your email address to the link
+  (the `authuser` parameter). Kaigi adds it only to `https` links whose host
+  is exactly `meet.google.com`, so your browser sends it only to Google
 
 Kaigi does not use Google user data for advertising, profiling, analytics,
 credit or lending decisions, or any purpose other than these features. Kaigi
@@ -107,12 +107,23 @@ data brokers, and AI services.
 - **Sign out:** the "Sign out" button in Kaigi, or `bin/kaigi-google logout`,
   revokes the token with Google, deletes it from the keyring, removes the
   account from Kaigi's settings, and deletes that account's calendar cache.
+  If Google does not confirm the revocation and the token cannot be deleted
+  from the keyring either, Kaigi changes nothing, keeps the account and shows
+  an error so you can try again. If only the revocation is unconfirmed (for
+  example, you are offline), Kaigi deletes the token and the account from
+  your computer and asks you to remove its access at
+  <https://myaccount.google.com/permissions>.
 - **Revoke access from Google's side:** you can revoke Kaigi's access at any
   time at <https://myaccount.google.com/permissions>. Kaigi then can no longer
   read your calendar. To also remove data already cached on your computer,
   sign out in Kaigi or delete the folders below.
-- **Uninstall:** deleting `~/.config/kaigi`, `~/.local/state/kaigi`, and
-  `~/.cache/kaigi` removes everything Kaigi stored.
+- **Uninstall:** first sign out of each Google account in Kaigi (settings
+  window, Calendars tab), which revokes the token and deletes it from the
+  keyring. Then run `omarchy plugin remove penguinwokrs.kaigi` and delete
+  `~/.config/kaigi`, `~/.local/state/kaigi`, and `~/.cache/kaigi`. Deleting
+  the folders alone leaves the token in the keyring: if you already did,
+  remove it with `secret-tool clear service kaigi-google` and revoke Kaigi's
+  access at <https://myaccount.google.com/permissions>.
 
 Because the author never receives your data, there is nothing stored
 elsewhere to delete.

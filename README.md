@@ -36,7 +36,12 @@ omarchy plugin add https://github.com/penguinwokrs/omarchy-kaigi --enable
 This installs Kaigi into `~/.config/omarchy/plugins/penguinwokrs.kaigi` and
 puts the widget in `centerEnd`, next to the clock. Update it with
 `omarchy plugin update penguinwokrs.kaigi`, and remove it with
-`omarchy plugin remove penguinwokrs.kaigi`. Move the widget with
+`omarchy plugin remove penguinwokrs.kaigi`. Before removing it, sign out of
+your Google accounts (settings window, Calendars tab) so the token is revoked
+and deleted from the keyring; then delete `~/.config/kaigi`,
+`~/.local/state/kaigi` and `~/.cache/kaigi`. If you removed Kaigi without
+signing out, run `secret-tool clear service kaigi-google` and revoke its
+access at <https://myaccount.google.com/permissions>. Move the widget with
 `omarchy bar move penguinwokrs.kaigi --section right`.
 
 To work on the code, clone it anywhere and link it instead:
@@ -134,7 +139,10 @@ between profiles. The Calendars tab shows which profile each account uses.
   are skipped.
 - **Sign-out:** `ログアウト / Sign out` on the settings window's Calendars tab,
   or `bin/kaigi-google logout --account <name>`, revokes the token, removes it from the keyring
-  and deletes the cache.
+  and deletes the cache. If neither the revocation nor the keyring deletion
+  can be confirmed, the account is kept and an error is shown, so you can try
+  again; if only the revocation is unconfirmed, the account is removed and
+  Kaigi asks you to revoke its access on Google's side.
 - **Expired sign-in:** if Google rejects the sign-in (revoked, or 7 days in
   Testing), the popup shows a **再ログイン / Sign in again** button for that
   account only.

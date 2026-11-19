@@ -32,6 +32,7 @@ omarchy plugin add https://github.com/penguinwokrs/omarchy-kaigi --enable
 
 `~/.config/omarchy/plugins/penguinwokrs.kaigi` にインストールされ、ウィジェットが時計の右（`centerEnd`）に置かれます。
 更新は `omarchy plugin update penguinwokrs.kaigi`、削除は `omarchy plugin remove penguinwokrs.kaigi` です。
+削除する前に、設定画面の「カレンダー」タブで Google アカウントからログアウトしてください。トークンが無効になり、キーリングからも消えます。そのあと `~/.config/kaigi`、`~/.local/state/kaigi`、`~/.cache/kaigi` を削除します。ログアウトせずに削除した場合は、`secret-tool clear service kaigi-google` でキーリングのトークンを消し、<https://myaccount.google.com/permissions> で Kaigi のアクセスを取り消してください。
 ウィジェットは `omarchy bar move penguinwokrs.kaigi --section right` で移動できます。
 
 コードを触る場合は、好きな場所にクローンしてリンクを張る方法もあります。
@@ -86,7 +87,7 @@ Kaigi の OAuth クライアントは Google の審査（アプリの確認）�
 - **トークン**: リフレッシュトークンは `secret-tool` を通して GNOME キーリングに保存します。キーリングが使えないときだけ、`~/.local/state/kaigi/` の下に本人だけが読めるファイルとして保存します。アクセストークンはディスクに書きません。
 - **取得**: `refreshMinutes` ごとに予定を取り直し、`~/.cache/kaigi/` に本人だけが読める形でキャッシュします。`singleEvents=true` を使うので、繰り返しの予定は Google 側で展開されます。
 - **会議リンクと出欠**: 会議リンクは `conferenceData` か `hangoutLink` を最優先し、次に場所、説明の順に探します。自分の出欠は `attendees` の中の自分の項目（`self: true`）から読みます。勤務場所の予定は読み飛ばします。
-- **ログアウト**: 設定画面の「カレンダー」タブの **ログアウト**、または `bin/kaigi-google logout --account <名前>` で、トークンを無効にしてキーリングから消し、キャッシュも削除します。
+- **ログアウト**: 設定画面の「カレンダー」タブの **ログアウト**、または `bin/kaigi-google logout --account <名前>` で、トークンを無効にしてキーリングから消し、キャッシュも削除します。無効化もキーリングからの削除も確認できなかったときは、アカウントを残したままエラーを表示するので、やり直せます。無効化だけ確認できなかったとき（オフラインなど）は、このパソコンからはトークンとアカウントを消したうえで、Google 側でアクセスを取り消すよう案内します。
 - **ログインが切れたとき**: Google がログインを拒否した場合（取り消された、テスト中で7日経った など）、そのアカウントだけパネルに **再ログイン** ボタンが出ます。
 
 ### ほかの方法：iCal フィード
