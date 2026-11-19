@@ -48,8 +48,9 @@ Kaigi uses Google user data only for features you see on your own desktop:
   link, and calendar name
 - let you choose which calendars to show in the settings window
 - open meeting links in the Chrome profile signed in to the same Google
-  account, by matching your email address against Chrome's profile list on
-  your computer
+  account, by matching your email address against the Google accounts
+  signed in to each Chrome profile on your computer (Chrome's own "Local
+  State" and "Preferences" files, which stay on your computer)
 - open Google Meet links, including new meetings you start from the popup,
   as the right Google account, by adding your email address to the
   meet.google.com link (the `authuser` parameter). Your browser sends that

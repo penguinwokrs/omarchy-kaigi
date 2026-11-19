@@ -104,9 +104,13 @@ calendars on the settings window's Calendars tab.
 
 The popup offers **Googleでログイン / Sign in with Google** until the first
 account is signed in. Add more accounts with **アカウントを追加 / Add account**
-on the settings window's Calendars tab. Each account is keyed by its address. If a Chrome
-profile is signed in with that address, Kaigi uses it to open that account's
-meetings.
+on the settings window's Calendars tab. Each account is keyed by its address.
+With `webapp`, each account's meetings open in the Chrome profile signed in
+with that address: the profile whose Chrome sign-in it is, else one where it
+is signed in to Google (the most recently used first). Kaigi looks this up
+every time it reads your calendars, by address rather than by the account's
+`authuser` number, so it keeps working when accounts sign in or out or move
+between profiles. The Calendars tab shows which profile each account uses.
 
 ### How it works
 
@@ -204,7 +208,7 @@ use `omarchy-shell kaigi set <key> <json>`, for example
 | `actionGraceSeconds` | `300` | still fire this late, e.g. after suspend |
 | `openMeetingsIn` | `browser` | `browser` opens the link with `xdg-open` in your default browser. `webapp` opens it as its own window on the current workspace with `omarchy-launch-webapp` (Chromium-based browsers only) |
 | `providerOpeningModes` | `{}` | per-service opening, e.g. `{"zoom": "zoomApp", "teams": "teamsApp"}`. Values: `default` (follow `openMeetingsIn`), `browser`, `webapp`, or an app mode from "Supported services" below. Without the app installed, the link opens in the browser |
-| `chromeProfile` | `""` | With `webapp`: the Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Also settable per calendar. Empty means the last used profile. Useful if you keep Google accounts in separate Chrome profiles |
+| `chromeProfile` | `""` | With `webapp`: the Chrome profile folder to open meetings in (`Default`, `Profile 2`, …; see `chrome://version`). Empty means the last used profile. Google accounts use the profile signed in to them instead; this one is for iCal calendars and accounts no profile is signed in to. Also settable per calendar: on a Google calendar it is kept while that profile is still signed in to the account, otherwise Kaigi goes back to finding the profile |
 | `customRegexes` | `[]` | extra link patterns, tried last |
 | `filterEventRegexes` | `[]` | hide events whose title matches |
 | `dismissedEvents` | `[]` | ids of events you hid with "Hide this event"; they get no notifications or auto-join either |

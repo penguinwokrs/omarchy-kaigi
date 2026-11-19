@@ -20,6 +20,7 @@ import html
 import http.server
 import json
 import os
+import re
 import secrets
 import shutil
 import signal
@@ -349,42 +350,96 @@ def login(account="default", http_client=None, opener=default_opener, secrets_st
         where = secrets_store.store(account, tok["refresh_token"])
         accounts[account] = {"email": email, "addedAt": int(time.time()), "storage": where}
         write_private(accounts_path, json.dumps(accounts, indent=2) + "\n")
-        ensure_config_entry(account, config_path, email)
+        ensure_config_entry(account, config_path)
     progress({"event": "done", "account": account, "email": email, "storage": where})
     return email
 
 
-def chrome_profile_for(email, config_home=None):
-    """Chrome/Chromium profile folder whose signed-in Google account is `email`."""
+PROFILE_DIR = re.compile(r"[A-Za-z0-9 _.-]{1,40}")
+
+
+def chrome_state(config_home=None):
+    """The Chrome (else Chromium) profiles and the Google accounts signed in to
+    each, read from Local State and each profile's Preferences on every call,
+    so moving an account between profiles or signing one out is picked up.
+
+    {"browser", "profiles": [{dir, name, email, accounts}], "rank": [dir, ...]}:
+    email is the profile's primary (Chrome sign-in) account; accounts holds it
+    and the other accounts signed in to Google in that profile (account_info),
+    lowercased. rank lists folders most recently used first.
+    """
+    config_home = config_home or os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
+    for browser in ("google-chrome", "chromium"):
+        root = os.path.join(config_home, browser)
+        state = read_json(os.path.join(root, "Local State"), {})
+        info = (state.get("profile") or {}) if isinstance(state, dict) else {}
+        cache = info.get("info_cache") if isinstance(info.get("info_cache"), dict) else {}
+        profiles = []
+        for folder, entry in sorted(cache.items()):
+            if not isinstance(entry, dict) or not PROFILE_DIR.fullmatch(folder):
+                continue
+            primary = str(entry.get("user_name", ""))[:80]
+            accounts = {primary.lower()} if primary else set()
+            prefs = read_json(os.path.join(root, folder, "Preferences"), {})
+            for acct in (prefs.get("account_info") if isinstance(prefs, dict) else None) or []:
+                if isinstance(acct, dict) and acct.get("email"):
+                    accounts.add(str(acct["email"]).lower())
+            profiles.append({"dir": folder, "name": str(entry.get("name", ""))[:40], "email": primary,
+                             "accounts": sorted(accounts)})
+        if profiles:
+            rank = []
+            for folder in [info.get("last_used")] + list(info.get("last_active_profiles") or []) \
+                    + list(info.get("profiles_order") or []):
+                if isinstance(folder, str) and folder not in rank:
+                    rank.append(folder)
+            return {"browser": browser, "profiles": profiles, "rank": rank}
+    return {"browser": "", "profiles": [], "rank": []}
+
+
+def resolve_chrome_profile(email, stored, state):
+    """Which profile to open an account's meetings in: (folder, source, stale).
+
+    stored (the calendar's chromeProfile) wins while that profile still has
+    the account. Otherwise the profile whose Chrome sign-in is the account
+    ("primary"), else one where it is signed in to Google ("signedIn", the
+    most recently used first). Accounts are matched by address, never by
+    their authuser position, which changes as accounts sign in and out.
+    stale is True when stored is gone or is signed in to other accounts only;
+    a profile with no accounts recorded keeps a choice made by hand.
+    ("", "none", ...) when no profile has the account.
+    """
+    email = str(email or "").lower()
+    profiles = state.get("profiles") or []
+    stale = False
+    if stored:
+        found = next((p for p in profiles if p["dir"] == stored), None)
+        # Without Chrome's files (another browser) there is nothing to check against.
+        if not profiles or (found and (not email or not found["accounts"] or email in found["accounts"])):
+            return stored, "config", False
+        stale = True
     if not email:
-        return ""
-    config_home = config_home or os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
-    for browser in ("google-chrome", "chromium"):
-        state = read_json(os.path.join(config_home, browser, "Local State"), {})
-        cache = ((state.get("profile") or {}).get("info_cache") or {}) if isinstance(state, dict) else {}
-        for folder, info in cache.items():
-            if isinstance(info, dict) and str(info.get("user_name", "")).lower() == email.lower():
-                return folder
-    return ""
+        return "", "none", stale
+    primary = [p for p in profiles if p["email"].lower() == email]
+    if primary:
+        return primary[0]["dir"], "primary", stale
+    rank = state.get("rank") or []
+    signed = sorted((p for p in profiles if email in p["accounts"]),
+                    key=lambda p: (rank.index(p["dir"]) if p["dir"] in rank else len(rank), p["dir"]))
+    if signed:
+        return signed[0]["dir"], "signedIn", stale
+    return "", "none", stale
 
 
-def chrome_profiles(config_home=None):
+def chrome_profiles(state=None):
     """[{dir, name, email, browser}] for the settings window's profile picker."""
-    config_home = config_home or os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
-    out = []
-    for browser in ("google-chrome", "chromium"):
-        state = read_json(os.path.join(config_home, browser, "Local State"), {})
-        cache = ((state.get("profile") or {}).get("info_cache") or {}) if isinstance(state, dict) else {}
-        for folder, info in sorted(cache.items()):
-            if isinstance(info, dict):
-                out.append({"dir": folder, "name": str(info.get("name", ""))[:40],
-                            "email": str(info.get("user_name", ""))[:80], "browser": browser})
-        if out:
-            break
-    return out
+    state = state if state is not None else chrome_state()
+    return [{"dir": p["dir"], "name": p["name"], "email": p["email"], "browser": state["browser"]}
+            for p in state["profiles"]]
 
 
-def ensure_config_entry(account, config_path=CONFIG_PATH, email="", config_home=None):
+# The entry has no chromeProfile: the profile is found when meetings open
+# (resolve_chrome_profile), so it follows the account if it moves.
+def ensure_config_entry(account, config_path=CONFIG_PATH):
     config = read_json(config_path, {})
     if not isinstance(config, dict):
         config = {}
@@ -392,11 +447,7 @@ def ensure_config_entry(account, config_path=CONFIG_PATH, email="", config_home=
     if not isinstance(cals, list):
         cals = []
     if not any(isinstance(c, dict) and c.get("type") == "google" and c.get("account", "default") == account for c in cals):
-        entry = {"type": "google", "name": "Google", "account": account, "calendarIds": []}
-        profile = chrome_profile_for(email, config_home)
-        if profile:
-            entry["chromeProfile"] = profile
-        cals.append(entry)
+        cals.append({"type": "google", "name": "Google", "account": account, "calendarIds": []})
         config["calendars"] = cals
         write_private(config_path, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
 

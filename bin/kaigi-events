@@ -884,7 +884,8 @@ def main(argv=None):
     events = []
     result["accounts"] = []      # Google entries, for the settings window
     result["feeds"] = []         # iCalendar entries (names only; URLs are secrets)
-    result["chromeProfiles"] = google.chrome_profiles()
+    chrome = google.chrome_state()
+    result["chromeProfiles"] = google.chrome_profiles(chrome)
     result["schemeHandlers"] = scheme_handlers()
     google_accounts = google.read_json(google.ACCOUNTS_PATH, {})
     for i, (config_index, cal) in enumerate(calendars):
@@ -892,9 +893,13 @@ def main(argv=None):
         emails = set(base_emails)
         if cal.get("email"):
             emails.add(str(cal["email"]).lower())
-        profile = str(cal.get("chromeProfile") or config.get("chromeProfile") or "")
-        if not re.fullmatch(r"[A-Za-z0-9 _.-]{1,40}", profile):
-            profile = ""
+        global_profile = str(config.get("chromeProfile") or "")
+        if not re.fullmatch(r"[A-Za-z0-9 _.-]{1,40}", global_profile):
+            global_profile = ""
+        stored = str(cal.get("chromeProfile") or "")
+        if not re.fullmatch(r"[A-Za-z0-9 _.-]{1,40}", stored):
+            stored = ""
+        profile = stored or global_profile
         start_count = len(events)
         if cal.get("type") == "google":
             account = str(cal.get("account") or "default")
@@ -903,10 +908,15 @@ def main(argv=None):
                 result["errors"].append({"calendar": name, "message": str(gerr)[:200], "code": gerr.code,
                                          "account": account})
             email = str(google_accounts.get(account, {}).get("email", ""))
+            # The profile signed in to this account, found on every run so it
+            # follows the account between profiles (by address, not authuser).
+            resolved, source, stale = google.resolve_chrome_profile(email, stored, chrome)
+            profile = resolved or global_profile
             result["accounts"].append({
                 "configIndex": config_index, "account": account, "email": email,
                 "calendarIds": [str(x) for x in (cal.get("calendarIds") or [])][:100],
-                "chromeProfile": str(cal.get("chromeProfile") or ""),
+                "chromeProfile": stored, "resolvedProfile": profile,
+                "profileSource": source, "profileStale": stale,
                 "pendingAutoJoin": pending_auto_join_map(cal),
                 "calendars": (snap or {}).get("allCalendars") or (snap or {}).get("calendars") or [],
                 "activeIds": [c["id"] for c in (snap or {}).get("calendars", [])],

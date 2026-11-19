@@ -297,8 +297,10 @@ test("new meeting URLs and bookmarks", () => {
   assert.ok(M.launchableUrl(M.createMeetingUrl("meet", null, "me@example.com")))
   assert.deepEqual(M.createMeetingAccounts([
     { email: "work@example.com", chromeProfile: "Profile 2" }, { email: "Work@example.com", chromeProfile: "Profile 9" },
-    { email: "" }, { email: "me@gmail.com", chromeProfile: "" }, null], { chromeProfile: "Default" }), [
-    { email: "work@example.com", profile: "Profile 2" }, { email: "me@gmail.com", profile: "Default" }
+    { email: "" }, { email: "me@gmail.com", chromeProfile: "" }, null,
+    { email: "moved@x.com", chromeProfile: "Profile 2", resolvedProfile: "Profile 4" }], { chromeProfile: "Default" }), [
+    { email: "work@example.com", profile: "Profile 2" }, { email: "me@gmail.com", profile: "Default" },
+    { email: "moved@x.com", profile: "Profile 4" }
   ])
   assert.deepEqual(M.createMeetingAccounts(undefined, {}), [])
   assert.deepEqual(M.parseBookmarks(["Daily standup https://meet.google.com/abc-defg-hij", "https://zoom.us/j/1",

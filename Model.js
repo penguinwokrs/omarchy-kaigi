@@ -362,8 +362,9 @@ function createMeetingUrl(service, random, email) {
 // The signed-in Google accounts a new Meet meeting can be created as, from
 // kaigi-events' accounts list (one entry per Google calendar; several can
 // share an account): [{ email, profile }], one per address, in config order.
-// profile is the account's Chrome profile (per calendar, else the global
-// one), which only applies when meetings open as web apps.
+// profile is the Chrome profile kaigi-events found for the account
+// (resolvedProfile), else the calendar's or the global one. It only applies
+// when meetings open as web apps.
 function createMeetingAccounts(accounts, config) {
   var out = [], seen = {}
   var fallback = String((config && config.chromeProfile) || "")
@@ -372,7 +373,8 @@ function createMeetingAccounts(accounts, config) {
     var email = a && typeof a.email === "string" ? a.email.trim() : ""
     if (!email || seen[email.toLowerCase()]) continue
     seen[email.toLowerCase()] = true
-    out.push({ email: email, profile: String(a.chromeProfile || "") || fallback })
+    var profile = typeof a.resolvedProfile === "string" ? a.resolvedProfile : String(a.chromeProfile || "") || fallback
+    out.push({ email: email, profile: profile })
   }
   return out
 }

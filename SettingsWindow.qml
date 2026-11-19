@@ -113,6 +113,20 @@ Item {
       out.push({ value: list[i].dir, label: (list[i].name || list[i].dir) + (list[i].email ? " · " + list[i].email : "") })
     return out
   }
+  // A Google account's own list: "" finds the profile signed in to it.
+  readonly property var accountProfileOptions: [{ value: "", label: strings.t("settings.profileAuto") }].concat(profileOptions.slice(1))
+  function profileLabel(dir) {
+    var list = service ? service.chromeProfiles : []
+    for (var i = 0; i < list.length; i++) if (list[i].dir === dir) return list[i].name || dir
+    return dir || strings.t("settings.profileLastUsed")
+  }
+  // Where an account's meetings open, from kaigi-events (resolvedProfile).
+  function accountProfileNote(m) {
+    if (m.profileStale) return strings.t("settings.profileStale").arg(m.chromeProfile).arg(profileLabel(m.resolvedProfile))
+    if (m.profileSource === "primary" || m.profileSource === "signedIn") return strings.t("settings.profileFound").arg(profileLabel(m.resolvedProfile))
+    if (m.profileSource === "none") return strings.t("settings.profileNone").arg(profileLabel(m.resolvedProfile))
+    return ""
+  }
   readonly property var tabs: [
     { id: "general", icon: "\uDB81\uDC93", label: strings.t("settings.tab.general") },
     { id: "notifications", icon: "\uDB80\uDC9A", label: strings.t("settings.tab.notifications") },
@@ -561,12 +575,17 @@ Item {
             width: root.rowWidth
             label: strings.t("settings.accountProfile")
             value: String(acct.modelData.chromeProfile || "")
-            options: root.profileOptions
+            options: root.accountProfileOptions
             enabled: root.str("openMeetingsIn") === "webapp"
             opacity: enabled ? 1 : 0.4
             foreground: root.fg
             fontFamily: root.fontFamily
             onChanged: function(v) { root.service.setCalendarProfile(acct.modelData.configIndex, v) }
+          }
+          Note {
+            visible: text !== "" && root.str("openMeetingsIn") === "webapp"
+            color: acct.modelData.profileStale || acct.modelData.profileSource === "none" ? root.urgent : root.dim
+            text: root.accountProfileNote(acct.modelData)
           }
           Item { width: 1; height: Style.space(8) }
         }

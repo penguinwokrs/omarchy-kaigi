@@ -158,7 +158,7 @@ class LoginTests(unittest.TestCase):
         os.kill(os.getpid(), signal.SIGTERM)
         self.assertEqual(stopped, [True])
 
-    def test_add_account_auto_keys_by_email_and_finds_chrome_profile(self):
+    def test_add_account_auto_keys_by_email_and_leaves_profile_automatic(self):
         chrome = os.path.join(self.tmp.name, "cfg", "google-chrome")
         os.makedirs(chrome)
         with open(os.path.join(chrome, "Local State"), "w") as fh:
@@ -174,7 +174,9 @@ class LoginTests(unittest.TestCase):
             self.assertIn("me@example.com", secrets.data)
             entry = [c for c in g.read_json(self.config, {})["calendars"] if c.get("type") == "google"][0]
             self.assertEqual(entry["account"], "me@example.com")
-            self.assertEqual(entry["chromeProfile"], "Profile 2")
+            # The profile is found when meetings open, so it can follow the account.
+            self.assertNotIn("chromeProfile", entry)
+            self.assertEqual(g.resolve_chrome_profile("me@example.com", "", g.chrome_state())[:2], ("Profile 2", "primary"))
             # Adding the same address again reuses its key instead of duplicating it.
             opener, _ = self.browser()
             g.login("auto", http_client=fake, opener=opener, secrets_store=secrets, client_path=self.client_path,
@@ -363,6 +365,61 @@ class ConvertTests(unittest.TestCase):
         base = {"start": {"dateTime": "2026-11-16T12:00:00+09:00"}, "end": {"dateTime": "2026-11-16T13:00:00+09:00"}}
         self.assertEqual(self.convert([dict(base, id="l", summary="Lunch")], filters=["^Lunch$"]), [])
 
+
+
+class ChromeProfileTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = os.path.join(self.tmp.name, "google-chrome")
+        os.makedirs(self.root)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, info_cache, accounts, last_used="Default", active=()):
+        with open(os.path.join(self.root, "Local State"), "w") as fh:
+            json.dump({"profile": {"info_cache": info_cache, "last_used": last_used,
+                                   "last_active_profiles": list(active)}}, fh)
+        for folder, emails in accounts.items():
+            os.makedirs(os.path.join(self.root, folder), exist_ok=True)
+            with open(os.path.join(self.root, folder, "Preferences"), "w") as fh:
+                json.dump({"account_info": [{"email": e} for e in emails]}, fh)
+        return g.chrome_state(self.tmp.name)
+
+    def test_primary_then_signed_in_then_none(self):
+        state = self.write({"Default": {"user_name": "a@x.com", "name": "Home"}, "Profile 2": {"user_name": "Work@X.com"}},
+                           {"Default": ["a@x.com", "b@x.com", "work@x.com"], "Profile 2": ["work@x.com"]})
+        self.assertEqual(state["profiles"][0]["accounts"], ["a@x.com", "b@x.com", "work@x.com"])
+        # The profile Chrome is signed in to wins over one where it is only signed in to Google.
+        self.assertEqual(g.resolve_chrome_profile("work@x.com", "", state), ("Profile 2", "primary", False))
+        self.assertEqual(g.resolve_chrome_profile("B@x.com", "", state), ("Default", "signedIn", False))
+        self.assertEqual(g.resolve_chrome_profile("c@x.com", "", state), ("", "none", False))
+        self.assertEqual(g.chrome_profiles(state)[0], {"dir": "Default", "name": "Home", "email": "a@x.com",
+                                                       "browser": "google-chrome"})
+
+    def test_signed_in_prefers_the_most_recently_used_profile(self):
+        state = self.write({"Default": {}, "Profile 3": {}}, {"Default": ["b@x.com"], "Profile 3": ["b@x.com"]},
+                           last_used="Profile 3")
+        self.assertEqual(g.resolve_chrome_profile("b@x.com", "", state)[0], "Profile 3")
+
+    def test_a_stored_profile_is_kept_while_it_has_the_account(self):
+        state = self.write({"Default": {"user_name": "a@x.com"}, "Profile 2": {"user_name": "b@x.com"}},
+                           {"Default": ["a@x.com", "b@x.com"], "Profile 2": ["b@x.com"]})
+        self.assertEqual(g.resolve_chrome_profile("b@x.com", "Default", state), ("Default", "config", False))
+        # The account moved out of the stored profile, or the profile is gone: back to automatic.
+        self.assertEqual(g.resolve_chrome_profile("a@x.com", "Profile 2", state), ("Default", "primary", True))
+        self.assertEqual(g.resolve_chrome_profile("a@x.com", "Profile 9", state), ("Default", "primary", True))
+        self.assertEqual(g.resolve_chrome_profile("z@x.com", "Profile 9", state), ("", "none", True))
+        # A profile with no accounts recorded keeps the choice.
+        state = self.write({"Default": {"user_name": "a@x.com"}, "Profile 5": {}}, {"Default": ["a@x.com"]})
+        self.assertEqual(g.resolve_chrome_profile("a@x.com", "Profile 5", state), ("Profile 5", "config", False))
+        # Without Chrome's files there is nothing to check, so the choice stands.
+        self.assertEqual(g.resolve_chrome_profile("a@x.com", "Profile 9", {"profiles": []}), ("Profile 9", "config", False))
+
+    def test_odd_folders_and_unreadable_preferences_are_tolerated(self):
+        state = self.write({"Default": {"user_name": "a@x.com"}, "../evil": {"user_name": "e@x.com"}, "Profile 4": "x"}, {})
+        self.assertEqual([p["dir"] for p in state["profiles"]], ["Default"])
+        self.assertEqual(state["profiles"][0]["accounts"], ["a@x.com"])
 
 if __name__ == "__main__":
     unittest.main()
