@@ -187,10 +187,10 @@ MeetingBar にある Google Meet の「Meet in One」と「Google Meet PWA」は
 ## 仕組み
 
 - `bin/kaigi_google.py` と `bin/kaigi-google` が Google へのログインと Calendar API を担当します。Python の標準ライブラリだけで動きます。
-- `bin/kaigi-events` も標準ライブラリだけで動きます。フィードを読み、繰り返しの予定（RRULE、EXDATE、RDATE、RECURRENCE-ID、タイムゾーン、夏時間）を展開し、MeetingBar のリンク判定と同じ方法で会議リンクを探します。69種類のサービスのパターンは `bin/services.json` にあります。会議アプリの URL スキーム（`zoommtg` など）が登録されているかも調べます。結果は JSON で出力します。
+- `bin/kaigi-events` も標準ライブラリだけで動きます。フィードを読み、繰り返しの予定（RRULE、EXDATE、RDATE、RECURRENCE-ID、タイムゾーン、夏時間）を展開し、`bin/services.json` にある69種類のサービスのパターンで会議リンクを探します。会議アプリの URL スキーム（`zoommtg` など）が登録されているかも調べます。結果は JSON で出力します。
 - `Service.qml` はシェルに1つだけ常駐します。1分ごとにヘルパーを呼び、5秒ごとに通知や自動参加の時刻を確認します。通知や参加の前に、その操作を `~/.local/state/kaigi/fired.json` に記録します。そのため、モニターが複数あっても、プラグインの再読み込みや `omarchy restart shell` をしても、同じ操作は繰り返されません。
 - 開くのは、既知のサービス（または `customRegexes`）に一致した `https`、`http`、`zoommtg`、`discord` のURLと、そこから作った会議アプリ用のURL（`msteams`、`jitsi-meet`、`slack`、`riversidefm`、`tuple`、`workchat`）だけです。URLはシェルを通さず、引数として渡します。
-- `Panel.qml` がバーのウィジェットとパネル、`SettingsWindow.qml` が設定画面です。`Model.js` に MeetingBar から移植した予定の選び方、表示、タイミングの計算が入っています。
+- `Panel.qml` がバーのウィジェットとパネル、`SettingsWindow.qml` が設定画面です。`Model.js` に予定の選び方、表示、タイミングの計算が入っています。
 
 ## 開発
 

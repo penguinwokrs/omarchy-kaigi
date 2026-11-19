@@ -254,8 +254,8 @@ open in the browser).
   the Calendar API, using only the Python standard library.
 - `bin/kaigi-events` also uses only the standard library. It parses the
   feeds and expands recurrences (RRULE, EXDATE, RDATE, RECURRENCE-ID, TZID,
-  DST), then finds the meeting link the way MeetingBar's link detector does.
-  The 69 service patterns are in `bin/services.json`. It also checks which
+  DST), then finds the meeting link using the 69 service patterns in
+  `bin/services.json`. It also checks which
   meeting-app URL schemes (`zoommtg`, …) have a handler. It prints JSON.
 - `Service.qml` runs once per shell. It polls the helper every minute and
   checks for due actions every 5 s. Before it notifies or joins, it records the
@@ -267,7 +267,7 @@ open in the browser).
   `workchat`), are opened. They are passed as
   argv, never through a shell.
 - `Panel.qml` is the bar widget and popup, and `SettingsWindow.qml` is the
-  settings window. `Model.js` holds the ported selection, formatting and
+  settings window. `Model.js` holds the event selection, formatting and
   scheduling logic.
 
 ## Development
