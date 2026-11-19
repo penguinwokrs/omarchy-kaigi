@@ -495,9 +495,22 @@ def find_link(fields, custom_patterns):
 
 
 def add_authuser(url, email):
-    if not email or "meet.google.com" not in url or "authuser=" in url:
+    """Adds the account's address as authuser, only to https links whose host
+    is exactly meet.google.com, so the address never goes anywhere else."""
+    if not email:
         return url
-    return url + ("&" if "?" in url else "?") + "authuser=" + urllib.parse.quote(email)
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host, port = parts.hostname, parts.port
+    except ValueError:
+        return url
+    if parts.scheme != "https" or host != "meet.google.com" or parts.username is not None \
+            or parts.password is not None or port not in (None, 443):
+        return url
+    if any(k == "authuser" for k, _v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)):
+        return url
+    query = (parts.query + "&" if parts.query else "") + "authuser=" + urllib.parse.quote(email, safe="")
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
 
 
 # --------------------------------------------------------------------------

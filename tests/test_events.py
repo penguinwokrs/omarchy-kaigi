@@ -232,6 +232,27 @@ class LinkTests(unittest.TestCase):
         ev = run(text, dt.datetime(2026, 11, 16, tzinfo=TOKYO))
         self.assertEqual(ev[0]["link"]["url"], "https://meet.google.com/abc-defg-hij?authuser=me%40example.com")
 
+    def test_authuser_only_for_google_meet_host(self):
+        add = me.add_authuser
+        self.assertEqual(add("https://meet.google.com/abc-defg-hij", "a@example.com"),
+                         "https://meet.google.com/abc-defg-hij?authuser=a%40example.com")
+        self.assertEqual(add("https://meet.google.com/abc?pli=1#x", "a@example.com"),
+                         "https://meet.google.com/abc?pli=1&authuser=a%40example.com#x")
+        # Already chosen: left alone.
+        self.assertEqual(add("https://meet.google.com/abc?authuser=1", "a@example.com"),
+                         "https://meet.google.com/abc?authuser=1")
+        for url in ("https://meet.google.com.evil.example/abc",
+                    "https://evil.example/meet.google.com/abc",
+                    "https://evil.example/?next=https://meet.google.com/abc",
+                    "https://meet.google.com@evil.example/abc",
+                    "https://user:pw@meet.google.com/abc",
+                    "https://meet.google.com:8443/abc",
+                    "https://meet.google.com:bad/abc",
+                    "http://meet.google.com/abc",
+                    "https://xmeet.google.com/abc"):
+            self.assertEqual(add(url, "a@example.com"), url, url)
+        self.assertEqual(add("https://meet.google.com/abc", None), "https://meet.google.com/abc")
+
 
 class MainTests(unittest.TestCase):
     def test_local_file_calendar_and_filters(self):
