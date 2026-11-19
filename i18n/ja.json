@@ -37,6 +37,7 @@
   "settings.title": "Kaigi の設定",
   "settings.close": "閉じる",
   "settings.tab.general": "一般",
+  "settings.tab.notifications": "通知",
   "settings.tab.calendars": "カレンダー",
   "settings.tab.appearance": "表示",
   "settings.tab.events": "予定",

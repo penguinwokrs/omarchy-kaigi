@@ -167,8 +167,8 @@ Open the settings window from the popup's **設定 / Settings** button, or run
 immediately:
 
 - **General:** auto-join (and, per calendar, whether it opens invitations you
-  haven't answered), start and end notifications with their timing, and how
-  and in which Chrome profile meetings open.
+  haven't answered), and how and in which Chrome profile meetings open.
+- **Notifications:** start and end notifications with their timing.
 - **Calendars:** Google accounts (add or sign out), which calendars to show for
   each account, each account's Chrome profile, iCal feeds, and the display
   period.

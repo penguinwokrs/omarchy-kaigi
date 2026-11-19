@@ -37,6 +37,7 @@
   "settings.title": "Kaigi Settings",
   "settings.close": "Close",
   "settings.tab.general": "General",
+  "settings.tab.notifications": "Notifications",
   "settings.tab.calendars": "Calendars",
   "settings.tab.appearance": "Appearance",
   "settings.tab.events": "Events",

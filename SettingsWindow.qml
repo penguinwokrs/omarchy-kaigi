@@ -115,6 +115,7 @@ Item {
   }
   readonly property var tabs: [
     { id: "general", icon: "\uDB81\uDC93", label: strings.t("settings.tab.general") },
+    { id: "notifications", icon: "\uDB80\uDC9A", label: strings.t("settings.tab.notifications") },
     { id: "calendars", icon: "\uDB80\uDCED", label: strings.t("settings.tab.calendars") },
     { id: "appearance", icon: "\uDB80\uDFD8", label: strings.t("settings.tab.appearance") },
     { id: "events", icon: "\uDB80\uDE33", label: strings.t("settings.tab.events") },
@@ -371,7 +372,8 @@ Item {
             Loader {
               id: page
               width: flick.width
-              sourceComponent: root.tab === "calendars" ? calendarsPage
+              sourceComponent: root.tab === "notifications" ? notificationsPage
+                : root.tab === "calendars" ? calendarsPage
                 : root.tab === "appearance" ? appearancePage
                 : root.tab === "events" ? eventsPage
                 : root.tab === "advanced" ? advancedPage
@@ -427,11 +429,6 @@ Item {
         text: root.str("showPendingEvents") === "hide" ? strings.t("settings.pendingAutoJoin.hidden") : strings.t("settings.pendingAutoJoin.note")
       }
 
-      Heading { text: strings.t("settings.notifications") }
-      SwitchRow { key: "joinEventNotification"; fallback: true; label: strings.t("settings.notifyStart") }
-      ChoiceRow { key: "joinEventNotificationTime"; numeric: true; label: strings.t("settings.when.start"); options: root.timingStart; enabled: root.on("joinEventNotification", true) }
-      SwitchRow { key: "endOfEventNotification"; fallback: true; label: strings.t("settings.notifyEnd") }
-      ChoiceRow { key: "endOfEventNotificationTime"; numeric: true; label: strings.t("settings.when.end"); options: root.timingEnd; enabled: root.on("endOfEventNotification", true) }
       Note { text: strings.t("settings.actionsNote") }
 
       Heading { text: strings.t("settings.openMeetings") }
@@ -459,6 +456,20 @@ Item {
         }
       }
       Note { text: strings.t("settings.servicesNote") }
+    }
+  }
+
+  Component {
+    id: notificationsPage
+    Column {
+      spacing: Style.space(8)
+
+      Heading { text: strings.t("settings.notifications") }
+      SwitchRow { key: "joinEventNotification"; fallback: true; label: strings.t("settings.notifyStart") }
+      ChoiceRow { key: "joinEventNotificationTime"; numeric: true; label: strings.t("settings.when.start"); options: root.timingStart; enabled: root.on("joinEventNotification", true) }
+      SwitchRow { key: "endOfEventNotification"; fallback: true; label: strings.t("settings.notifyEnd") }
+      ChoiceRow { key: "endOfEventNotificationTime"; numeric: true; label: strings.t("settings.when.end"); options: root.timingEnd; enabled: root.on("endOfEventNotification", true) }
+      Note { text: strings.t("settings.actionsNote") }
     }
   }
 
