@@ -24,7 +24,10 @@ and ends, and can open the meeting by itself when it starts.
 
 ## Install
 
-Requires Omarchy 4.5 or later (it uses the Omarchy shell's plugin system).
+Requires Omarchy 4.5 or later (it uses the Omarchy shell's plugin system) and
+`python3`, standard library only. Optional: `secret-tool` (the `libsecret`
+package) to keep the Google sign-in token in the GNOME keyring; without it the
+token is stored in a file only you can read. Omarchy ships both.
 
 ```bash
 omarchy plugin add https://github.com/penguinwokrs/omarchy-kaigi --enable

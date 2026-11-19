@@ -24,7 +24,7 @@
 
 ## インストール
 
-Omarchy 4.5 以降が必要です（Omarchy シェルのプラグインの仕組みを使います）。
+Omarchy 4.5 以降（Omarchy シェルのプラグインの仕組みを使います）と、`python3`（標準ライブラリだけを使います）が必要です。Google のログインのトークンを GNOME キーリングに保存するには、`secret-tool`（`libsecret` パッケージ）も使います。ない場合は、本人だけが読めるファイルに保存します。どちらも Omarchy に入っています。
 
 ```bash
 omarchy plugin add https://github.com/penguinwokrs/omarchy-kaigi --enable
