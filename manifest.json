@@ -20,7 +20,7 @@
     "description": "Next meeting with countdown; click for today's events",
     "category": "Time",
     "allowMultiple": false,
-    "defaultSection": "centerEnd",
+    "defaultSection": "center",
     "defaults": {
       "eventTitleFormat": "show",
       "eventTimeFormat": "show",
