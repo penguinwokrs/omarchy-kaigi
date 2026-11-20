@@ -30,16 +30,22 @@ class FakeSecrets:
     def __init__(self, clear_ok=True):
         self.data = {}
         self.clear_ok = clear_ok
+        self.reachable = True
 
     def store(self, account, token):
         self.data[account] = token
         return "keyring"
 
+    def find(self, account):
+        if not self.reachable:
+            return None, False
+        return self.data.get(account), True
+
     def lookup(self, account):
-        return self.data.get(account)
+        return self.find(account)[0]
 
     def clear(self, account):
-        if not self.clear_ok:
+        if not self.clear_ok or not self.reachable:
             return False
         self.data.pop(account, None)
         return True
@@ -263,14 +269,38 @@ class LoginTests(unittest.TestCase):
         self.logout_with(FakeGoogle(), secrets)
         self.assertNotIn("default", g.read_json(self.accounts, {}))
 
-    def test_secrets_clear_reports_a_failing_keyring(self):
+    def test_logout_keeps_the_account_when_the_keyring_cannot_be_reached(self):
+        secrets = FakeSecrets()
+        cache = self.signed_in(secrets)
+        secrets.reachable = False
+        google = FakeGoogle()
+        with self.assertRaises(g.SignOutIncomplete):
+            self.logout_with(google, secrets)
+        self.assertNotIn(g.REVOKE_URL, [url for _m, url, _d in google.calls])
+        self.assertEqual(secrets.data.get("default"), "rt1")
+        self.assertIn("default", g.read_json(self.accounts, {}))
+        self.assertTrue(os.path.exists(cache))
+
+    def fake_tool(self, code, stderr="", stdout=""):
         tool = os.path.join(self.tmp.name, "secret-tool")
-        for code, expected in ((0, True), (1, False)):
-            with open(tool, "w") as fh:
-                fh.write(f"#!/bin/sh\nexit {code}\n")
-            os.chmod(tool, 0o755)
-            store = g.Secrets(state_dir=self.tmp.name, tool=tool)
-            self.assertIs(store.clear("default"), expected)
+        with open(tool, "w") as fh:
+            fh.write(f"#!/bin/sh\nprintf '%s' '{stdout}'\nprintf '%s' '{stderr}' >&2\nexit {code}\n")
+        os.chmod(tool, 0o755)
+        return g.Secrets(state_dir=self.tmp.name, tool=tool)
+
+    def test_secrets_tell_a_missing_token_from_an_unreachable_keyring(self):
+        # secret-tool exits 1 both for "nothing stored" (silent) and for a
+        # keyring it cannot reach (with a message on stderr).
+        self.assertEqual(self.fake_tool(0, stdout="rt1").find("default"), ("rt1", True))
+        self.assertEqual(self.fake_tool(1).find("default"), (None, True))
+        self.assertEqual(self.fake_tool(1, stderr="secret-tool: Cannot connect").find("default"), (None, False))
+        store = self.fake_tool(1, stderr="secret-tool: Cannot connect")
+        g.write_private(store._file("default"), "rt-file")
+        self.assertEqual(store.find("default"), ("rt-file", True))
+
+    def test_secrets_clear_reports_a_failing_keyring(self):
+        for code, stderr, expected in ((0, "", True), (1, "", True), (1, "secret-tool: Cannot connect", False)):
+            self.assertIs(self.fake_tool(code, stderr).clear("default"), expected)
 
     def test_bundled_client_is_the_fallback(self):
         bundled = os.path.join(self.tmp.name, "bundled.json")

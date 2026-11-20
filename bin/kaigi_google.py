@@ -200,32 +200,46 @@ class Secrets:
         write_private(self._file(account), token)
         return "file"
 
-    def lookup(self, account):
+    def _keyring(self, *args):
+        """Runs secret-tool: (returncode, stdout), or (None, b"") when it could
+        not run. A missing item is exit 1 with nothing on stderr; an unreachable
+        or locked keyring is exit 1 with an error message, reported as None."""
+        try:
+            r = subprocess.run([self.tool, *args, "service", SECRET_SERVICE], capture_output=True, timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            return None, b""
+        if r.returncode != 0 and r.stderr.strip():
+            return None, b""
+        return r.returncode, r.stdout
+
+    def find(self, account):
+        """(token, certain): certain is False when the keyring could not be
+        read, so a missing token may still be stored there."""
+        certain = True
         if self.tool:
-            try:
-                r = subprocess.run([self.tool, "lookup", "service", SECRET_SERVICE, "account", account],
-                                   capture_output=True, timeout=20)
-                if r.returncode == 0 and r.stdout.strip():
-                    return r.stdout.decode().strip()
-            except (OSError, subprocess.SubprocessError):
-                pass
+            code, out = self._keyring("lookup", "account", account)
+            if code == 0 and out.strip():
+                return out.decode().strip(), True
+            certain = code is not None
         try:
             with open(self._file(account), encoding="utf-8") as fh:
-                return fh.read().strip() or None
+                token = fh.read().strip() or None
+        except FileNotFoundError:
+            token = None
         except OSError:
-            return None
+            return None, False
+        return (token, True) if token else (None, certain)
+
+    def lookup(self, account):
+        return self.find(account)[0]
 
     def clear(self, account):
         """Removes the token from the keyring and the fallback file. True only
-        when both are confirmed gone (secret-tool exited 0, the file is absent)."""
+        when both are confirmed gone: secret-tool removed it or found nothing
+        to remove, and the file is absent."""
         ok = True
         if self.tool:
-            try:
-                r = subprocess.run([self.tool, "clear", "service", SECRET_SERVICE, "account", account],
-                                   capture_output=True, timeout=20)
-                ok = r.returncode == 0
-            except (OSError, subprocess.SubprocessError):
-                ok = False
+            ok = self._keyring("clear", "account", account)[0] is not None
         try:
             os.remove(self._file(account))
         except FileNotFoundError:
@@ -487,12 +501,18 @@ def logout(account="default", http_client=None, secrets_store=None, accounts_pat
     user can remove access on Google's side."""
     http_client = http_client or Http()
     secrets_store = secrets_store or Secrets()
-    token = secrets_store.lookup(account)
-    revoked = revoke(http_client, token) if token else True
-    cleared = secrets_store.clear(account) is not False and not secrets_store.lookup(account)
+    token, certain = secrets_store.find(account)
+    # With no token found there is nothing to revoke, but only if the keyring
+    # could be read: otherwise the token may still be there, unrevoked.
+    revoked = revoke(http_client, token) if token else certain
+    cleared = secrets_store.clear(account) is not False
+    if cleared:
+        left, certain = secrets_store.find(account)
+        cleared = certain and not left
     if not revoked and not cleared:
         raise SignOutIncomplete("Sign-out failed: Google did not confirm the revocation and the token could not be "
-                                "removed from the keyring. The account was kept; try again.")
+                                "removed from the keyring (or the keyring could not be reached). The account was "
+                                "kept; try again.")
     accounts = read_json(accounts_path, {})
     accounts.pop(account, None)
     write_private(accounts_path, json.dumps(accounts, indent=2) + "\n")
