@@ -31,13 +31,17 @@ class FakeSecrets:
         self.data = {}
         self.clear_ok = clear_ok
         self.reachable = True
+        self.locked = False  # the entry is listed but its secret is not returned, silently
+        self.tool = True
 
     def store(self, account, token):
         self.data[account] = token
         return "keyring"
 
-    def find(self, account):
-        if not self.reachable:
+    def find(self, account, keyring=False):
+        if not self.tool:
+            return None, not keyring
+        if not self.reachable or (self.locked and account in self.data):
             return None, False
         return self.data.get(account), True
 
@@ -45,6 +49,8 @@ class FakeSecrets:
         return self.find(account)[0]
 
     def clear(self, account):
+        if not self.tool or self.locked:
+            return True  # nothing reachable to remove, and nothing said
         if not self.clear_ok or not self.reachable:
             return False
         self.data.pop(account, None)
@@ -281,6 +287,44 @@ class LoginTests(unittest.TestCase):
         self.assertIn("default", g.read_json(self.accounts, {}))
         self.assertTrue(os.path.exists(cache))
 
+    def test_logout_keeps_the_account_when_the_token_is_locked_or_secret_tool_is_gone(self):
+        for broken in ("locked", "no tool"):
+            secrets = FakeSecrets()
+            cache = self.signed_in(secrets)
+            if broken == "locked":
+                secrets.locked = True
+            else:
+                secrets.tool = False
+            google = FakeGoogle()
+            with self.assertRaises(g.SignOutIncomplete):
+                self.logout_with(google, secrets)
+            self.assertNotIn(g.REVOKE_URL, [url for _m, url, _d in google.calls])
+            self.assertEqual(secrets.data.get("default"), "rt1")
+            self.assertIn("default", g.read_json(self.accounts, {}))
+            self.assertTrue(os.path.exists(cache))
+
+    def test_logout_without_secret_tool_still_works_for_a_file_token(self):
+        secrets = FakeSecrets()
+        self.signed_in(secrets)
+        accounts = g.read_json(self.accounts, {})
+        accounts["default"]["storage"] = "file"
+        g.write_private(self.accounts, json.dumps(accounts))
+        secrets.tool = False
+        self.logout_with(FakeGoogle(), secrets)
+        self.assertNotIn("default", g.read_json(self.accounts, {}))
+
+    def test_secrets_see_a_locked_entry_and_a_missing_secret_tool(self):
+        tool = os.path.join(self.tmp.name, "secret-tool")
+        for listed, expected in (("[/5]", (None, False)), ("", (None, True))):
+            with open(tool, "w") as fh:
+                fh.write(f"#!/bin/sh\n[ \"$1\" = search ] && printf '%s' '{listed}'\n"
+                         "[ \"$1\" = search ] && exit 0\nexit 1\n")
+            os.chmod(tool, 0o755)
+            self.assertEqual(g.Secrets(state_dir=self.tmp.name, tool=tool).find("default"), expected)
+        store = g.Secrets(state_dir=self.tmp.name, tool="")
+        self.assertEqual(store.find("default", keyring=True), (None, False))
+        self.assertEqual(store.find("default"), (None, True))
+
     def fake_tool(self, code, stderr="", stdout=""):
         tool = os.path.join(self.tmp.name, "secret-tool")
         with open(tool, "w") as fh:
@@ -290,9 +334,9 @@ class LoginTests(unittest.TestCase):
 
     def test_secrets_tell_a_missing_token_from_an_unreachable_keyring(self):
         # secret-tool exits 1 both for "nothing stored" (silent) and for a
-        # keyring it cannot reach (with a message on stderr).
+        # keyring it cannot reach (with a message on stderr); "nothing stored"
+        # is checked with search in test_secrets_see_a_locked_entry_….
         self.assertEqual(self.fake_tool(0, stdout="rt1").find("default"), ("rt1", True))
-        self.assertEqual(self.fake_tool(1).find("default"), (None, True))
         self.assertEqual(self.fake_tool(1, stderr="secret-tool: Cannot connect").find("default"), (None, False))
         store = self.fake_tool(1, stderr="secret-tool: Cannot connect")
         g.write_private(store._file("default"), "rt-file")

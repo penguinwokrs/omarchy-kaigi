@@ -140,7 +140,7 @@ between profiles. The Calendars tab shows which profile each account uses.
 - **Sign-out:** `ログアウト / Sign out` on the settings window's Calendars tab,
   or `bin/kaigi-google logout --account <name>`, revokes the token, removes it from the keyring
   and deletes the cache. If neither the revocation nor the keyring deletion
-  can be confirmed (including when the keyring cannot be reached), the account is kept and an error is shown, so you can try
+  can be confirmed (including when the keyring cannot be read: unreachable, locked, or `secret-tool` missing), the account is kept and an error is shown, so you can try
   again; if only the revocation is unconfirmed, the account is removed and
   Kaigi asks you to revoke its access on Google's side.
 - **Expired sign-in:** if Google rejects the sign-in (revoked, or 7 days in

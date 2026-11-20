@@ -212,15 +212,20 @@ class Secrets:
             return None, b""
         return r.returncode, r.stdout
 
-    def find(self, account):
-        """(token, certain): certain is False when the keyring could not be
-        read, so a missing token may still be stored there."""
-        certain = True
+    def find(self, account, keyring=False):
+        """(token, certain): certain is False when a token may still be stored
+        where it could not be read: the keyring could not be reached, it holds
+        an entry for the account whose secret it did not return (locked), or,
+        for a token stored in the keyring (keyring=True), secret-tool is gone."""
+        certain = not keyring
         if self.tool:
             code, out = self._keyring("lookup", "account", account)
             if code == 0 and out.strip():
                 return out.decode().strip(), True
-            certain = code is not None
+            if code is not None:
+                # "search --all" lists entries even when their secret is locked.
+                code, out = self._keyring("search", "--all", "account", account)
+            certain = code == 0 and not out.strip()
         try:
             with open(self._file(account), encoding="utf-8") as fh:
                 token = fh.read().strip() or None
@@ -501,18 +506,20 @@ def logout(account="default", http_client=None, secrets_store=None, accounts_pat
     user can remove access on Google's side."""
     http_client = http_client or Http()
     secrets_store = secrets_store or Secrets()
-    token, certain = secrets_store.find(account)
-    # With no token found there is nothing to revoke, but only if the keyring
-    # could be read: otherwise the token may still be there, unrevoked.
+    entry = read_json(accounts_path, {}).get(account)
+    keyring = not (isinstance(entry, dict) and entry.get("storage") == "file")
+    token, certain = secrets_store.find(account, keyring=keyring)
+    # With no token found there is nothing to revoke, but only if nothing could
+    # be hiding it: otherwise the token may still be there, unrevoked.
     revoked = revoke(http_client, token) if token else certain
     cleared = secrets_store.clear(account) is not False
     if cleared:
-        left, certain = secrets_store.find(account)
+        left, certain = secrets_store.find(account, keyring=keyring)
         cleared = certain and not left
     if not revoked and not cleared:
         raise SignOutIncomplete("Sign-out failed: Google did not confirm the revocation and the token could not be "
-                                "removed from the keyring (or the keyring could not be reached). The account was "
-                                "kept; try again.")
+                                "removed from the keyring, or the keyring could not be read (unreachable, locked, or "
+                                "secret-tool missing). The account was kept; unlock the keyring and try again.")
     accounts = read_json(accounts_path, {})
     accounts.pop(account, None)
     write_private(accounts_path, json.dumps(accounts, indent=2) + "\n")

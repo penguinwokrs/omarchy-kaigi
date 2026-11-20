@@ -108,8 +108,8 @@ data brokers, and AI services.
   revokes the token with Google, deletes it from the keyring, removes the
   account from Kaigi's settings, and deletes that account's calendar cache.
   If Google does not confirm the revocation and the token cannot be deleted
-  from the keyring either, or the keyring cannot be reached to find the
-  token, Kaigi changes nothing, keeps the account and shows
+  from the keyring either, or the keyring cannot be read (unreachable,
+  locked, or `secret-tool` missing), Kaigi changes nothing, keeps the account and shows
   an error so you can try again. If only the revocation is unconfirmed (for
   example, you are offline), Kaigi deletes the token and the account from
   your computer and asks you to remove its access at
